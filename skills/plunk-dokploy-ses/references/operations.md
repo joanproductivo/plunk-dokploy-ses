@@ -26,6 +26,8 @@ Medido con Plunk 0.17.0. El contenedor `plunk` lleva varios programas Node.js ge
 
 Contenedor: ~330 MB con todo, ~190 MB recortado. Además: Postgres ~98 MB, MinIO ~85–98 MB, Redis ~7 MB. Una instalación completa recortada ronda los 400 MB.
 
+Disco: Docker no limita por defecto el log de cada contenedor (el healthcheck ya escribe ~1 MB al día y cada email añade varias líneas). La plantilla lo deja en 3 ficheros de 10 MB por servicio (como mucho ~120 MB por instalación). Para comprobarlo, `HostConfig.LogConfig.Config` del contenedor (docker inspect, o `docker-getConfig` en el MCP de Dokploy) debe mostrar `max-size` y `max-file`; si sale vacío, el compose desplegado no lleva el bloque `logging`. Plunk guarda los eventos en Postgres, así que rotar el log no pierde nada importante.
+
 ## 2. Arranque recortado
 
 El compose sustituye `entrypoint`/`command` del servicio `plunk`: copia el script original `/usr/local/bin/docker-entrypoint-nginx.sh`, quita con `sed` la preparación de landing y wiki, y antes de `exec pm2-runtime start /tmp/ecosystem.config.js` ejecuta un filtro que elimina `landing`, `wiki` y `smtp` de la configuración de PM2.

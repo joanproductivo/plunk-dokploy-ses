@@ -6,6 +6,7 @@
 #   - Servicios con prefijo plunk- para evitar choques de nombres DNS con otros stacks del servidor
 #   - Sin relay SMTP (puertos 465/587) ni ntfy (avisos push que nadie recibía)
 #   - Arranque sin landing, wiki ni relay SMTP para ahorrar ~100 MB (ver el servicio plunk)
+#   - Logs de cada contenedor limitados a 3 ficheros de 10 MB (Docker no los rota por defecto)
 # Los valores ${...} vienen de la pestaña Environment de Dokploy (ver assets/env.template).
 # Una variable solo llega a Plunk si aparece en la sección environment de abajo.
 # En comandos, $$ es un $ literal (Docker Compose interpreta $ como variable).
@@ -14,6 +15,11 @@ services:
   plunk-postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_DB: plunk
       POSTGRES_USER: plunk
@@ -29,6 +35,11 @@ services:
   plunk-redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -42,6 +53,11 @@ services:
   plunk-minio:
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -57,6 +73,11 @@ services:
   plunk:
     image: ghcr.io/useplunk/plunk:0.17.0
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     # Arranca Plunk sin landing, wiki ni el relay SMTP para ahorrar ~100 MB.
     # Si una versión nueva cambia el script de arranque y el parche no aplica, arranca todo como siempre.
     # Para volver al arranque original, borra entrypoint y command.
