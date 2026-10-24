@@ -1,0 +1,11 @@
+# MCP de Plunk accesible desde claude.ai, con login (Dokploy, compose raw con isolatedDeployment)
+# - plunk-mcp: el MCP oficial de Plunk servido por HTTP. Sin dominio: solo lo ve el proxy.
+# - plunk-mcp-auth: mcp-auth-proxy. Exige iniciar sesión con GitHub (solo los usuarios permitidos)
+#   y hace de servidor OAuth para claude.ai. Dominio en Dokploy: servicio plunk-mcp-auth, puerto 80.
+# Los valores ${...} vienen de la pestaña Environment de Dokploy.
+
+services:
+  plunk-mcp:
+    build:
+      context: .
+      dockerfile_inline: |

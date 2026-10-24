@@ -1,0 +1,154 @@
+# Plunk self-hosted para Dokploy (compose "raw", con isolatedDeployment activado)
+# Basado en https://github.com/useplunk/plunk/blob/main/docker-compose.yml
+# Cambios respecto al original:
+#   - Versión de Plunk fijada aquí (no :latest) para que actualizar sea un cambio consciente del compose
+#   - Sin container_name ni puertos publicados en el host: Traefik de Dokploy enruta por dominio
+#   - Servicios con prefijo plunk- para evitar choques de nombres DNS con otros stacks del servidor
+#   - Sin relay SMTP (puertos 465/587) ni ntfy (avisos push que nadie recibía)
+#   - Arranque sin landing, wiki ni relay SMTP para ahorrar ~100 MB (ver el servicio plunk)
+# Los valores ${...} vienen de la pestaña Environment de Dokploy (ver assets/env.template).
+# Una variable solo llega a Plunk si aparece en la sección environment de abajo.
+# En comandos, $$ es un $ literal (Docker Compose interpreta $ como variable).
+
+services:
+  plunk-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: plunk
+      POSTGRES_USER: plunk
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plunk"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  plunk-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Guarda y sirve las imágenes subidas desde el editor de Plunk (dominio de "files")
+  plunk-minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  plunk:
+    image: ghcr.io/useplunk/plunk:0.17.0
+    restart: unless-stopped
+    # Arranca Plunk sin landing, wiki ni el relay SMTP para ahorrar ~100 MB.
+    # Si una versión nueva cambia el script de arranque y el parche no aplica, arranca todo como siempre.
+    # Para volver al arranque original, borra entrypoint y command.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        orig=/usr/local/bin/docker-entrypoint-nginx.sh
+        patched=/tmp/plunk-entrypoint.sh
+        cat > /tmp/plunk-filter-apps.js <<'EOF'
+        const file = '/tmp/ecosystem.config.js';
+        const config = require(file);
+        const skip = ['landing', 'wiki', 'smtp'];
+        config.apps = config.apps.filter(app => !skip.includes(app.name));
+        require('fs').writeFileSync(file, 'module.exports = ' + JSON.stringify(config, null, 2) + ';\n');
+        console.log('Plunk: arrancando ' + config.apps.map(app => app.name).join(', '));
+        EOF
+        sed -e '/replace_urls_in_app "landing"/d' \
+            -e '/replace_urls_in_app "wiki"/d' \
+            -e 's#^exec pm2-runtime start /tmp/ecosystem.config.js$$#node /tmp/plunk-filter-apps.js || echo "AVISO: no se pudieron quitar landing, wiki y smtp"; exec pm2-runtime start /tmp/ecosystem.config.js#' \
+            "$$orig" > "$$patched"
+        if grep -q 'plunk-filter-apps.js' "$$patched"; then exec sh "$$patched"; fi
+        echo "AVISO: el parche de arranque no aplica a esta versión de Plunk; arrancando todos los servicios"
+        exec "$$orig"
+    environment:
+      SERVICE: all
+      NODE_ENV: production
+
+      DATABASE_URL: postgresql://plunk:${DB_PASSWORD}@plunk-postgres:5432/plunk
+      DIRECT_DATABASE_URL: postgresql://plunk:${DB_PASSWORD}@plunk-postgres:5432/plunk
+      REDIS_URL: redis://plunk-redis:6379
+
+      JWT_SECRET: ${JWT_SECRET}
+
+      NGINX_PORT: 80
+      API_DOMAIN: ${API_DOMAIN}
+      DASHBOARD_DOMAIN: ${DASHBOARD_DOMAIN}
+      # Landing y docs no se publican: dominios internos que no existen fuera del contenedor
+      LANDING_DOMAIN: ${LANDING_DOMAIN:-landing.plunk.internal}
+      WIKI_DOMAIN: ${WIKI_DOMAIN:-docs.plunk.internal}
+      USE_HTTPS: ${USE_HTTPS:-true}
+      # Los enlaces del panel a la landing y a las docs apuntan al propio panel
+      LANDING_URI: ${LANDING_URI:-}
+      WIKI_URI: ${WIKI_URI:-}
+
+      AWS_SES_REGION: ${AWS_SES_REGION}
+      AWS_SES_ACCESS_KEY_ID: ${AWS_SES_ACCESS_KEY_ID}
+      AWS_SES_SECRET_ACCESS_KEY: ${AWS_SES_SECRET_ACCESS_KEY}
+      SES_CONFIGURATION_SET: ${SES_CONFIGURATION_SET:-plunk-configuration-set}
+      # Defínela siempre en el env: si existe (aunque vacía), Plunk muestra el selector de tracking
+      SES_CONFIGURATION_SET_NO_TRACKING: ${SES_CONFIGURATION_SET_NO_TRACKING}
+      MAIL_FROM_SUBDOMAIN: ${MAIL_FROM_SUBDOMAIN:-}
+      EMAIL_RATE_LIMIT_PER_SECOND: ${EMAIL_RATE_LIMIT_PER_SECOND:-}
+
+      GITHUB_OAUTH_CLIENT: ${GITHUB_OAUTH_CLIENT:-}
+      GITHUB_OAUTH_SECRET: ${GITHUB_OAUTH_SECRET:-}
+      GOOGLE_OAUTH_CLIENT: ${GOOGLE_OAUTH_CLIENT:-}
+      GOOGLE_OAUTH_SECRET: ${GOOGLE_OAUTH_SECRET:-}
+
+      S3_ENDPOINT: http://plunk-minio:9000
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      S3_ACCESS_KEY_SECRET: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: uploads
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL}
+      S3_FORCE_PATH_STYLE: "true"
+
+      # Emails de la plataforma (recuperar contraseña, avisos de dominio): clave sk_ de un proyecto y remitente verificado
+      PLUNK_API_KEY: ${PLUNK_API_KEY:-}
+      PLUNK_FROM_ADDRESS: ${PLUNK_FROM_ADDRESS:-}
+
+      AUTO_PROJECT_DISABLE: ${AUTO_PROJECT_DISABLE:-false}
+      DISABLE_SIGNUPS: ${DISABLE_SIGNUPS:-false}
+      SHOW_SPONSOR: ${SHOW_SPONSOR:-false}
+      # Límite por proyecto en la API pública; actívalo cuando uses la clave pk_ en formularios web
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
+    volumes:
+      - plunk_data:/app/data
+    depends_on:
+      plunk-postgres:
+        condition: service_healthy
+      plunk-redis:
+        condition: service_healthy
+      plunk-minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  plunk_data:

@@ -1,0 +1,36 @@
+    restart: unless-stopped
+    environment:
+      PLUNK_MCP_API_URL: ${PLUNK_API_URL}
+      PLUNK_MCP_API_KEY: ${PLUNK_MCP_API_KEY}
+      PLUNK_PUBLIC_KEY: ${PLUNK_PUBLIC_KEY:-}
+      PLUNK_READ_ONLY: ${PLUNK_READ_ONLY:-false}
+      PLUNK_ALLOW_UNCONFIRMED_SENDS: ${PLUNK_ALLOW_UNCONFIRMED_SENDS:-false}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  plunk-mcp-auth:
+    image: ghcr.io/sigbit/mcp-auth-proxy:2.10.2
+    restart: unless-stopped
+    command: ["http://plunk-mcp:3000"]
+    environment:
+      EXTERNAL_URL: https://${MCP_DOMAIN}
+      # Traefik de Dokploy termina el TLS; el proxy escucha en HTTP dentro de la red
+      NO_AUTO_TLS: "true"
+      LISTEN: ":80"
+      DATA_PATH: /data
+      TRUSTED_PROXIES: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      HTTP_STREAMING_ONLY: "true"
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITHUB_ALLOWED_USERS: ${GITHUB_ALLOWED_USERS}
+    volumes:
+      - auth_data:/data
+    depends_on:
+      plunk-mcp:
+        condition: service_healthy
+
+volumes:
+  auth_data:

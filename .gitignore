@@ -1,0 +1,3 @@
+# El paquete .skill se adjunta a cada versión en GitHub Releases
+dist/
+.DS_Store
