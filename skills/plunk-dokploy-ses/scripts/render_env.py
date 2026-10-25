@@ -2,11 +2,14 @@
 """Genera el env de Plunk para Dokploy con secretos internos nuevos.
 
 Escribe el archivo con permisos 600 y muestra solo los nombres de las variables,
-nunca los valores. Las claves de AWS quedan como PEGAR_EN_DOKPLOY: las pega la
-persona en la pestaña Environment de Dokploy.
+nunca los valores. Las claves de AWS quedan como PEGAR_EN_DOKPLOY y las del bucket
+de imágenes (S3_ACCESS_KEY_ID, S3_ACCESS_KEY_SECRET) vacías: las pega la persona en la
+pestaña Environment de Dokploy. Con las del bucket vacías, Plunk arranca sin subidas
+de imágenes.
 
 Ejemplo:
-    python3 render_env.py --domain example.com --prefix envio --region eu-north-1 --out plunk.env
+    python3 render_env.py --domain example.com --prefix envio --region eu-north-1 \
+        --s3-endpoint https://<account_id>.r2.cloudflarestorage.com --s3-bucket envio-example --out plunk.env
     python3 render_env.py --panel mail.example.com --api mail-api.example.com \
         --files mail-files.example.com --region eu-west-1 --out plunk.env
 """
@@ -23,7 +26,9 @@ def main():
     p.add_argument("--prefix", default="envio", help="prefijo de los subdominios (por defecto: envio)")
     p.add_argument("--panel", help="dominio del panel (sobrescribe el calculado)")
     p.add_argument("--api", help="dominio de la API (sobrescribe el calculado)")
-    p.add_argument("--files", help="dominio de las imágenes/MinIO (sobrescribe el calculado)")
+    p.add_argument("--files", help="dominio público del bucket de imágenes (sobrescribe el calculado)")
+    p.add_argument("--s3-endpoint", default="", help="endpoint S3 del bucket de imágenes, p. ej. https://<account_id>.r2.cloudflarestorage.com")
+    p.add_argument("--s3-bucket", default="", help="nombre del bucket de imágenes")
     p.add_argument("--region", required=True, help="región de AWS SES, p. ej. eu-north-1")
     p.add_argument("--out", required=True, help="archivo de salida (se crea con permisos 600)")
     p.add_argument("--force", action="store_true", help="sobrescribir el archivo si ya existe")
@@ -46,11 +51,8 @@ def main():
     values = [
         ("DB_PASSWORD", secrets.token_hex(24)),
         ("JWT_SECRET", secrets.token_hex(32)),
-        ("MINIO_ROOT_USER", "plunk" + secrets.token_hex(6)),
-        ("MINIO_ROOT_PASSWORD", secrets.token_hex(24)),
         ("DASHBOARD_DOMAIN", panel),
         ("API_DOMAIN", api),
-        ("S3_PUBLIC_URL", f"https://{files}/uploads"),
         ("LANDING_DOMAIN", "landing.plunk.internal"),
         ("WIKI_DOMAIN", "docs.plunk.internal"),
         ("LANDING_URI", f"https://{panel}"),
@@ -61,6 +63,11 @@ def main():
         ("AWS_SES_SECRET_ACCESS_KEY", "PEGAR_EN_DOKPLOY"),
         ("SES_CONFIGURATION_SET", "plunk-configuration-set"),
         ("SES_CONFIGURATION_SET_NO_TRACKING", "plunk-no-tracking-configuration-set"),
+        ("S3_ENDPOINT", a.s3_endpoint),
+        ("S3_BUCKET", a.s3_bucket),
+        ("S3_ACCESS_KEY_ID", ""),
+        ("S3_ACCESS_KEY_SECRET", ""),
+        ("S3_PUBLIC_URL", f"https://{files}"),
         ("DISABLE_SIGNUPS", "false"),
         ("AUTO_PROJECT_DISABLE", "false"),
         ("SHOW_SPONSOR", "false"),
@@ -71,7 +78,10 @@ def main():
     os.chmod(a.out, 0o600)
 
     print(f"Escrito {a.out} (permisos 600) con: " + ", ".join(k for k, _ in values))
-    print(f"Dominios en Dokploy: {panel} y {api} -> servicio plunk, puerto 80; {files} -> servicio plunk-minio, puerto 9000")
+    print(f"Dominios en Dokploy: {panel} y {api} -> servicio plunk, puerto 80")
+    print(f"{files}: dominio propio del bucket de imágenes (en R2: Settings -> Custom Domains), no va en Dokploy")
+    if not (a.s3_endpoint and a.s3_bucket):
+        print("AVISO: faltan --s3-endpoint o --s3-bucket; rellena S3_ENDPOINT y S3_BUCKET en el env antes de pegar las claves", file=sys.stderr)
 
 
 if __name__ == "__main__":

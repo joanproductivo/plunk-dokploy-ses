@@ -6,7 +6,7 @@
 3. Actualizar Plunk
 4. Variables de entorno, reiniciar y desplegar
 5. Copias de seguridad
-6. MinIO (imágenes) y cómo sustituirlo
+6. Imágenes del editor (R2 u otro S3)
 7. ntfy (avisos push)
 8. Cambiar de dominio más adelante
 9. Abrir registros para otra persona
@@ -24,7 +24,7 @@ Medido con Plunk 0.17.0. El contenedor `plunk` lleva varios programas Node.js ge
 | pm2 + nginx | Supervisor y enrutado por dominio | ~28 MB |
 | wiki, landing, smtp | Docs, web promocional, relay SMTP | ~104 MB (quitados por el arranque recortado) |
 
-Contenedor: ~330 MB con todo, ~190 MB recortado. Además: Postgres ~98 MB, MinIO ~85–98 MB, Redis ~7 MB. Una instalación completa recortada ronda los 400 MB.
+Contenedor: ~330 MB con todo, ~190 MB recortado. Además: Postgres ~98 MB y Redis ~7 MB. Una instalación completa recortada ronda los 300 MB (MinIO, si se monta, suma ~90 MB).
 
 Disco: Docker no limita por defecto el log de cada contenedor (el healthcheck ya escribe ~1 MB al día y cada email añade varias líneas). La plantilla lo deja en 3 ficheros de 10 MB por servicio (como mucho ~120 MB por instalación). Para comprobarlo, `HostConfig.LogConfig.Config` del contenedor (docker inspect, o `docker-getConfig` en el MCP de Dokploy) debe mostrar `max-size` y `max-file`; si sale vacío, el compose desplegado no lleva el bloque `logging`. Plunk guarda los eventos en Postgres, así que rotar el log no pierde nada importante.
 
@@ -63,32 +63,27 @@ La versión está fijada en el compose (`image: ghcr.io/useplunk/plunk:0.17.0`),
 Todo lo importante (contactos, plantillas, campañas, eventos, workflows) está en Postgres. Redis solo guarda colas.
 
 - En Dokploy: Settings → Destinations para crear un destino S3 (Cloudflare R2, AWS S3, Backblaze…); luego en el compose → Backups, una copia programada de la base de datos `plunk` (servicio `plunk-postgres`, usuario `plunk`), por ejemplo diaria.
-- Si se suben imágenes desde el editor, copia también el volumen de MinIO (volume backups de Dokploy) o usa un almacenamiento externo (sección 6).
+- Las imágenes del editor están en el bucket externo (sección 6), fuera del servidor. Si se usa MinIO, copia también su volumen (volume backups de Dokploy).
 - Prueba a restaurar una vez: una copia que nunca se ha restaurado es una suposición.
 
-## 6. MinIO (imágenes) y cómo sustituirlo
+## 6. Imágenes del editor (R2 u otro S3)
 
-MinIO solo guarda las imágenes subidas desde el editor de Plunk (plantillas y campañas) y las sirve públicamente en el dominio de "files" para que se vean en los emails. Al arrancar, Plunk crea el bucket `uploads` y lo hace público.
+Plunk sube las imágenes del editor (plantillas y campañas) a un almacenamiento S3 y las enlaza en los emails con `S3_PUBLIC_URL`. Se configura con cinco variables, **todas en el env** (el compose solo las lee con `${…}`), más `S3_FORCE_PATH_STYLE: "true"` fijo en el compose:
 
-**Dónde se configura:** no en el panel de Plunk, sino en el compose y el env:
+| Variable | Valor con Cloudflare R2 |
+|---|---|
+| `S3_ENDPOINT` | `https://<account_id>.r2.cloudflarestorage.com` |
+| `S3_BUCKET` | nombre del bucket |
+| `S3_ACCESS_KEY_ID` / `S3_ACCESS_KEY_SECRET` | claves de un token de R2 con lectura y escritura solo en ese bucket (las pega la persona) |
+| `S3_PUBLIC_URL` | `https://envio-files.<dominio>` (el dominio propio del bucket, sin barra final) |
 
-| Variable | Dónde | Valor con MinIO |
-|---|---|---|
-| `S3_ENDPOINT` | compose | `http://plunk-minio:9000` |
-| `S3_BUCKET` | compose | `uploads` |
-| `S3_FORCE_PATH_STYLE` | compose | `"true"` |
-| `S3_ACCESS_KEY_ID` / `S3_ACCESS_KEY_SECRET` | compose, desde `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` del env | |
-| `S3_PUBLIC_URL` | env | `https://<files>/uploads` |
+Si faltan las claves, Plunk arranca igual con `File uploads (S3) ❌` y el editor no ofrece subir imágenes. Al arrancar con claves, Plunk comprueba el bucket (lo crea si no existe) e intenta aplicarle una política pública. R2 no admite esa operación: sale `[S3] Failed to set bucket policy: NotImplemented`, que es inofensivo, y por eso el bucket se hace público desde R2 con el dominio propio. Las imágenes quedan en `<S3_PUBLIC_URL>/<id del proyecto>/<fecha>-<hash>.<ext>`.
 
-**Sustituirlo por Cloudflare R2 (u otro S3)** ahorra ~90 MB y saca las imágenes del servidor:
-1. La persona crea el bucket en R2, le da acceso público (dominio propio o URL pública de R2) y crea un token de API con lectura/escritura solo en ese bucket.
-2. En el compose: `S3_ENDPOINT: https://<account_id>.r2.cloudflarestorage.com`, `S3_BUCKET: <bucket>`, `S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}`, `S3_ACCESS_KEY_SECRET: ${S3_ACCESS_KEY_SECRET}`; quita el servicio `plunk-minio`, su `depends_on` y su volumen.
-3. La persona añade en el env `S3_ACCESS_KEY_ID`, `S3_ACCESS_KEY_SECRET` y cambia `S3_PUBLIC_URL` a la URL pública del bucket; despliega.
-4. Quita el dominio de "files" en Dokploy solo si MinIO estaba vacío: las imágenes ya enviadas apuntan a esa URL y se romperían. Si había imágenes, cópialas antes al bucket nuevo y mantén el dominio viejo un tiempo.
+**Cambiar de bucket o de proveedor:** las imágenes ya enviadas apuntan a la URL vieja y se romperían. Antes de cambiar, copia los objetos al bucket nuevo con la misma ruta y conserva el dominio (o mantén el viejo un tiempo). Si solo eran pruebas, basta con cambiar las variables y desplegar.
 
-Aviso esperado con R2: un error inofensivo en el log al arrancar, porque Plunk intenta aplicar una política de bucket (PutBucketPolicy) que R2 no admite. Por eso el bucket debe hacerse público desde R2.
+**Alternativa sin servicio externo: MinIO en el servidor.** Gasta ~90 MB de memoria y deja las imágenes en un volumen que hay que copiar aparte. Añade al compose un servicio `plunk-minio` (imagen `pgsty/minio`, `command: server /data --console-address ":9001"`, `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` del env, volumen en `/data` y healthcheck a `http://localhost:9000/minio/health/live`), su `depends_on` desde `plunk` y su volumen. En el env: `S3_ENDPOINT=http://plunk-minio:9000`, `S3_BUCKET=uploads`, `S3_ACCESS_KEY_ID`/`S3_ACCESS_KEY_SECRET` con los mismos valores que `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`, y `S3_PUBLIC_URL=https://envio-files.<dominio>/uploads`. En Dokploy, el dominio `envio-files.<dominio>` va al servicio `plunk-minio`, puerto 9000. Para quitarlo después, borra antes ese dominio en Dokploy: si no, el despliegue falla con `Domain "…" is attached to service "plunk-minio" which does not exist in the compose`.
 
-**Quitarlo sin sustituto:** el editor deja de ofrecer subir imágenes y se usan imágenes por URL (de una web, por ejemplo).
+**Sin subidas:** deja las claves vacías. Se usan imágenes por URL (de una web, por ejemplo).
 
 ## 7. ntfy (avisos push)
 

@@ -7,6 +7,7 @@
 #   - Sin relay SMTP (puertos 465/587) ni ntfy (avisos push que nadie recibía)
 #   - Arranque sin landing, wiki ni relay SMTP para ahorrar ~100 MB (ver el servicio plunk)
 #   - Logs de cada contenedor limitados a 3 ficheros de 10 MB (Docker no los rota por defecto)
+#   - Sin MinIO: las imágenes del editor van a un S3 externo (Cloudflare R2 u otro), configurado en el env
 # Los valores ${...} vienen de la pestaña Environment de Dokploy (ver assets/env.template).
 # Una variable solo llega a Plunk si aparece en la sección environment de abajo.
 # En comandos, $$ es un $ literal (Docker Compose interpreta $ como variable).
@@ -48,27 +49,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # Guarda y sirve las imágenes subidas desde el editor de Plunk (dominio de "files")
-  plunk-minio:
-    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
 
   plunk:
     image: ghcr.io/useplunk/plunk:0.17.0
@@ -136,11 +116,13 @@ services:
       GOOGLE_OAUTH_CLIENT: ${GOOGLE_OAUTH_CLIENT:-}
       GOOGLE_OAUTH_SECRET: ${GOOGLE_OAUTH_SECRET:-}
 
-      S3_ENDPOINT: http://plunk-minio:9000
-      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
-      S3_ACCESS_KEY_SECRET: ${MINIO_ROOT_PASSWORD}
-      S3_BUCKET: uploads
-      S3_PUBLIC_URL: ${S3_PUBLIC_URL}
+      # Imágenes del editor en un almacenamiento S3 externo (Cloudflare R2 u otro): las cinco van en el env.
+      # Con las claves vacías, Plunk arranca sin subidas de imágenes (File uploads ❌), sin errores.
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_ACCESS_KEY_SECRET: ${S3_ACCESS_KEY_SECRET:-}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
       S3_FORCE_PATH_STYLE: "true"
 
       # Emails de la plataforma (recuperar contraseña, avisos de dominio): clave sk_ de un proyecto y remitente verificado
@@ -159,8 +141,6 @@ services:
         condition: service_healthy
       plunk-redis:
         condition: service_healthy
-      plunk-minio:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
       interval: 30s
@@ -171,5 +151,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
   plunk_data:

@@ -10,7 +10,7 @@ Guía para montar una instalación privada de Plunk que envía a través de AWS 
 Al terminar, la persona tiene:
 - un panel en `https://envio.<dominio>`;
 - una API en `https://envio-api.<dominio>`;
-- las imágenes servidas en `https://envio-files.<dominio>`;
+- las imágenes del editor en un bucket de Cloudflare R2 (u otro S3), servidas en `https://envio-files.<dominio>`;
 - uno o varios dominios de envío verificados;
 - los eventos de SES (entregas, rebotes, quejas, clics) llegando a Plunk;
 - los registros cerrados.
@@ -20,8 +20,8 @@ Al terminar, la persona tiene:
 - **Habla en el idioma de la persona y sin jerga.** Muchas de las personas que instalan esto no son técnicas: explica qué hace cada paso en una frase, no cómo funciona por dentro.
 - **Comprueba cada fase antes de pasar a la siguiente.** Cada fase tiene su verificación. Si saltas una, el error aparece dos fases después y cuesta más encontrarlo.
 - **Secretos:**
-  - Los secretos internos (base de datos, JWT, MinIO) los generas tú con `scripts/render_env.py`. El archivo queda con permisos 600 y nunca muestras sus valores.
-  - Las **access keys de AWS** las crea la persona en la consola y las pega directamente en Dokploy. No le pidas que las pegue en el chat ni las crees tú: no deben pasar por la conversación.
+  - Los secretos internos (base de datos, JWT) los generas tú con `scripts/render_env.py`. El archivo queda con permisos 600 y nunca muestras sus valores.
+  - Las **access keys de AWS** y las **claves del token del bucket** (R2 u otro S3) las crea la persona y las pega directamente en Dokploy. No le pidas que las pegue en el chat ni las crees tú: no deben pasar por la conversación.
   - Una vez pegadas, **no vuelvas a escribir el env por la API de Dokploy**. Dokploy devuelve los secretos ocultos, y guardar ese env sustituiría las claves reales. A partir de ahí, cualquier cambio de variables lo hace la persona en la interfaz.
 - **Acciones hacia fuera, solo con un sí explícito:**
   - pedir a AWS la salida del sandbox;
@@ -44,14 +44,17 @@ Pregunta solo lo que no sepas ya:
 3. **Dominio de envío.** Recomienda un subdominio dedicado (`news.<dominio>`), distinto de los tres de la instalación (dns.md §3).
 4. **Región de SES.** La de la cuenta de AWS. Se usa la misma en todo.
 5. **Buzón para respuestas.** Plunk no recibe correo. Comprueba que la dirección de respuesta tiene un buzón que funcione (using-plunk.md §7).
-6. **Imagen oficial o Plunk Lite.** Por defecto se usa la imagen oficial de Plunk con el arranque recortado del compose. Plunk Lite es un fork ligero y no oficial, con Node 24, la mitad de tamaño y arreglos que la oficial aún no tiene, pero sin relay SMTP. Explícalo en una frase y pregúntalo solo si a la persona le importan la memoria, la seguridad de Node o esos arreglos (references/plunk-lite.md §2-3).
+6. **Dónde guardar las imágenes del editor.** Plunk las sube a un almacenamiento S3 y las enlaza en los emails. La plantilla no lleva MinIO: usa un bucket externo, por defecto Cloudflare R2 (10 GB gratis, sin coste de salida, y no gasta memoria del servidor). La persona crea el bucket, conecta `envio-files.<dominio>` como dominio propio del bucket (en R2: Settings → Custom Domains; hace público el bucket) y crea un token con lectura y escritura solo en ese bucket. Apunta el endpoint (`https://<account_id>.r2.cloudflarestorage.com`) y el nombre del bucket; las claves del token se pegan en Dokploy en la Fase 2. Si no quiere un servicio externo, ver operations.md §6 (MinIO en el servidor o sin subidas).
+7. **Imagen oficial o Plunk Lite.** Por defecto se usa la imagen oficial de Plunk con el arranque recortado del compose. Plunk Lite es un fork ligero y no oficial, con Node 24, la mitad de tamaño y arreglos que la oficial aún no tiene, pero sin relay SMTP. Explícalo en una frase y pregúntalo solo si a la persona le importan la memoria, la seguridad de Node o esos arreglos (references/plunk-lite.md §2-3).
 
 ## Fase 1: Desplegar en Dokploy
 
 1. Genera el env:
    ```bash
-   python3 scripts/render_env.py --domain <dominio> --prefix envio --region <región> --out plunk.env
+   python3 scripts/render_env.py --domain <dominio> --prefix envio --region <región> \
+       --s3-endpoint https://<account_id>.r2.cloudflarestorage.com --s3-bucket <bucket> --out plunk.env
    ```
+   Las cinco variables del bucket (`S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_ACCESS_KEY_SECRET`, `S3_PUBLIC_URL`) van siempre en el env, nunca escritas en el compose. Las dos claves quedan vacías: mientras lo estén, Plunk arranca sin subidas de imágenes y sin errores.
    Guárdalo donde la persona tenga su proyecto, no en un sitio público ni en un repositorio.
 2. Crea el compose en el proyecto de Dokploy que diga la persona: tipo docker-compose, origen raw y nombre `plunk`.
 3. Actualiza el compose con el contenido de `assets/docker-compose.yml` y con **isolatedDeployment activado**. Así Postgres y Redis quedan en una red privada que solo ve Plunk.
@@ -59,15 +62,15 @@ Pregunta solo lo que no sepas ya:
    - Con Plunk Lite, cambia antes la imagen por la última `sha-<commit>`, que da `scripts/plunk_lite_latest.py`, y quita el bloque `entrypoint`/`command` (references/plunk-lite.md §4).
    - Postgres y Redis van dentro del compose a propósito: aislamiento, arranque en orden (Plunk migra la base al arrancar) y un solo bloque que desplegar.
 4. Guarda el env con el contenido de `plunk.env`. Ahora sí puedes hacerlo por la API, porque aún no hay claves de AWS.
-5. Crea los tres dominios, con HTTPS, Let's Encrypt y path `/`:
+5. Crea los dos dominios, con HTTPS, Let's Encrypt y path `/`:
 
    | Dominio | Servicio | Puerto |
    |---|---|---|
    | `envio.<dominio>` | `plunk` | 80 |
    | `envio-api.<dominio>` | `plunk` | 80 |
-   | `envio-files.<dominio>` | `plunk-minio` | 9000 |
 
-6. DNS: los tres nombres deben apuntar a la IP del servidor, o estar cubiertos por un comodín. Con Cloudflare pueden ir con proxy, pero en modo SSL **Full** (dns.md §2).
+   `envio-files.<dominio>` no va en Dokploy: lo sirve el bucket (Fase 0, punto 6).
+6. DNS: el panel y la API deben apuntar a la IP del servidor, o estar cubiertos por un comodín. Con Cloudflare pueden ir con proxy, pero en modo SSL **Full** (dns.md §2). El de files lo crea R2 al conectar el dominio propio.
 7. Despliega.
 
 **Verificación:**
@@ -92,9 +95,10 @@ Lee references/aws-ses.md. En resumen:
    - el dominio de la API.
 
    Crea un usuario IAM sin claves y con permisos mínimos (solo desde esa IP y esa región), el topic SNS, los dos configuration sets y la suscripción a `https://<API>/webhooks/sns`. La API debe responder ya, porque Plunk confirma la suscripción en el momento.
-2. La persona crea la access key de `plunk-ses` y la pega en Dokploy, con los pasos de aws-ses.md §3. Después despliega.
+2. La persona crea la access key de `plunk-ses` y la pega en Dokploy, con los pasos de aws-ses.md §3. En el mismo momento pega las claves del token del bucket en `S3_ACCESS_KEY_ID` y `S3_ACCESS_KEY_SECRET`. Después despliega.
 3. **Verificación:**
    - El log de `plunk` muestra `AWS SES quota: 1 emails/second (0/200 emails sent today)`. Eso es el sandbox: las claves funcionan.
+   - En la tabla de arranque, `File uploads (S3)` sale `✅`. Con R2 sale además `[S3] Failed to set bucket policy: NotImplemented`: es esperado e inofensivo (R2 no admite esa operación; el bucket ya es público por su dominio propio). Prueba de verdad: la persona sube una imagen en el editor y la URL `https://envio-files.<dominio>/…` se abre desde fuera.
    - `scripts/ses_check.snippet.py` da la suscripción confirmada y una access key activa.
 4. **Plan de precios.** Las cuentas nuevas de SES llegan en Essentials (0,16 $ por 1.000 emails). À la carte cuesta 0,10 $ y Plunk ya da las métricas que añade Essentials. Explica la diferencia y cámbialo solo si la persona quiere (aws-ses.md §7).
 
@@ -145,7 +149,7 @@ Propón estos ajustes y explica cada uno en una frase. Los cambios de env los ha
 
 - **Enviar desde una web, eventos y workflows, MCP de Plunk:** references/using-plunk.md.
 - **Usar Plunk desde claude.ai (MCP remoto con login de GitHub):** references/mcp-remote.md y `assets/mcp-remoto/`. Lee antes la §5: claude.ai no puede mostrar la confirmación de envíos de Plunk.
-- **Actualizar, memoria, MinIO/R2, ntfy, cambiar de dominio, segunda instalación:** references/operations.md.
+- **Actualizar, memoria, almacenamiento de imágenes, ntfy, cambiar de dominio, segunda instalación:** references/operations.md.
 - **Plunk Lite (desplegar, actualizar o volver a la oficial):** references/plunk-lite.md.
 - **Algo falla:** references/troubleshooting.md.
 

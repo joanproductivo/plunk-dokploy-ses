@@ -57,7 +57,7 @@ Sigue la Fase 1 de SKILL.md con estos cambios en `assets/docker-compose.yml`, an
    Plunk Lite publica cada versión como `sha-<commit>` y, además, la más reciente como `latest` (sale de la rama `plunk-lite` del repositorio). En el compose usa siempre la `sha-<commit>`, no `latest`: con `latest`, cualquier despliegue o reinicio del servidor podría cambiar de versión sin que nadie lo decida y sin copia previa de la base de datos.
 3. Borra el bloque `entrypoint`/`command` del servicio `plunk`, con sus tres líneas de comentario. La imagen ya arranca solo lo necesario. Si se deja, no rompe nada, pero sobra.
 
-El resto no cambia: el env, MinIO o R2, los dominios, SES y el DNS.
+El resto no cambia: el env (con las variables `S3_*` del bucket), los dominios, SES y el DNS.
 
 **Verificación** (sustituye a la de la Fase 1):
 - El contenedor `plunk` queda healthy.

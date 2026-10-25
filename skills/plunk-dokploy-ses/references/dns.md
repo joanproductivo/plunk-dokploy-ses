@@ -17,17 +17,17 @@ Son cosas distintas: el dominio de la instalación aparece en los enlaces de baj
 
 ## 2. Registros de la instalación
 
-Tres registros A (o CNAME) hacia la IP del servidor, o un comodín `*.example.com` que ya los cubra:
+Dos registros A (o CNAME) hacia la IP del servidor, o un comodín `*.example.com` que ya los cubra, más el dominio de las imágenes, que apunta al bucket:
 
 | Nombre | Destino | Servicio en Dokploy |
 |---|---|---|
 | `envio` | IP del servidor | `plunk`, puerto 80 |
 | `envio-api` | IP del servidor | `plunk`, puerto 80 (el nginx interno separa panel y API por dominio) |
-| `envio-files` | IP del servidor | `plunk-minio`, puerto 9000 |
+| `envio-files` | El bucket de R2 (lo crea R2 al conectarlo como dominio propio; anula el comodín) | No va en Dokploy |
 
 **Un solo nivel de subdominio** (`envio-api.example.com`, no `api.envio.example.com`): el certificado gratuito de Cloudflare (Universal SSL) solo cubre `*.example.com`. Con otros proveedores DNS sin proxy da igual, pero mantener un nivel evita sorpresas.
 
-**Cloudflare:** estos tres pueden ir con la nube naranja (proxy). Funcionó con proxy y el certificado de Let's Encrypt que emite Traefik en el servidor. El modo SSL/TLS de la zona debe ser **Full** o **Full (strict)**: con **Flexible**, Cloudflare habla con el servidor por HTTP, Traefik redirige a HTTPS y se forma un bucle de redirecciones. Si Let's Encrypt no consigue emitir el certificado, pon la nube gris un momento y vuelve a desplegar.
+**Cloudflare:** el panel y la API pueden ir con la nube naranja (proxy). Funcionó con proxy y el certificado de Let's Encrypt que emite Traefik en el servidor. El modo SSL/TLS de la zona debe ser **Full** o **Full (strict)**: con **Flexible**, Cloudflare habla con el servidor por HTTP, Traefik redirige a HTTPS y se forma un bucle de redirecciones. Si Let's Encrypt no consigue emitir el certificado, pon la nube gris un momento y vuelve a desplegar.
 
 ## 3. Registros del dominio de envío
 

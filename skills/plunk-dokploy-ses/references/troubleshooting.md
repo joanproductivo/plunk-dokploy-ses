@@ -7,7 +7,7 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
 | El contenedor `plunk` tarda en estar healthy | Aplica migraciones de la base de datos al arrancar (el healthcheck da 90 s de margen) | Espera y lee el log; si falla, el error de Prisma/Postgres sale ahí |
-| 404 de Traefik en el panel o la API | El dominio en Dokploy apunta a otro servicio o puerto, o se añadió sin redesplegar | Panel y API → servicio `plunk`, puerto 80; files → `plunk-minio`, 9000; HTTPS + Let's Encrypt; despliega de nuevo |
+| 404 de Traefik en el panel o la API | El dominio en Dokploy apunta a otro servicio o puerto, o se añadió sin redesplegar | Panel y API → servicio `plunk`, puerto 80 (files no va en Dokploy: lo sirve el bucket); HTTPS + Let's Encrypt; despliega de nuevo |
 | Bucle de redirecciones con Cloudflare | Modo SSL/TLS "Flexible" | Ponlo en Full o Full (strict) (dns.md §2) |
 | Let's Encrypt no emite el certificado | El DNS aún no apunta al servidor, o el proxy interfiere | Comprueba el registro; prueba con nube gris y vuelve a desplegar |
 | El panel muestra enlaces a la landing o a las docs de Plunk | Faltan `LANDING_URI`/`WIKI_URI` | Apúntalos al propio panel |
