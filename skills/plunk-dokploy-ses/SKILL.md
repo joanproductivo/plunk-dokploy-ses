@@ -1,6 +1,6 @@
 ---
 name: plunk-dokploy-ses
-description: Despliega y configura Plunk self-hosted (useplunk/plunk, email marketing y transaccional open source) en Dokploy con AWS SES, de principio a fin. Incluye un compose probado y recortado en memoria, dominios con Traefik y Let's Encrypt, usuario IAM mínimo, configuration sets y SNS para eventos, registros DNS con las trampas de Cloudflare, salida del sandbox de SES y plan de precios. También cubre el envío desde una web por API (/v1/send, /v1/track), workflows, aperturas falsas, mantenimiento y el MCP de Plunk publicado con login para usarlo desde claude.ai. Úsala siempre que alguien quiera instalar, revisar, actualizar o arreglar Plunk en Dokploy o Docker con SES. También para conectar Plunk a AWS SES, verificar un dominio de envío, pedir producción en SES para Plunk o mandar emails de su web a través de Plunk, aunque no mencione Dokploy ni esta skill. En inglés también aplica (self-host Plunk, Plunk on Dokploy, Plunk SES setup).
+description: Despliega y configura Plunk self-hosted (useplunk/plunk, email marketing y transaccional open source) en Dokploy con AWS SES, de principio a fin. Incluye un compose probado y recortado en memoria, dominios con Traefik y Let's Encrypt, usuario IAM mínimo, configuration sets y SNS para eventos, registros DNS con las trampas de Cloudflare, salida del sandbox de SES y plan de precios. También cubre el envío desde una web por API (/v1/send, /v1/track), workflows, aperturas falsas, mantenimiento y el MCP de Plunk publicado con login para usarlo desde claude.ai. Permite usar la imagen oficial o Plunk Lite, un fork ligero no oficial. Úsala siempre que alguien quiera instalar, revisar, actualizar o arreglar Plunk en Dokploy o Docker con SES. También para conectar Plunk a AWS SES, verificar un dominio de envío, pedir producción en SES para Plunk o mandar emails de su web a través de Plunk, aunque no mencione Dokploy ni esta skill. En inglés también aplica (self-host Plunk, Plunk on Dokploy, Plunk SES setup).
 ---
 
 # Plunk en Dokploy con AWS SES
@@ -44,6 +44,7 @@ Pregunta solo lo que no sepas ya:
 3. **Dominio de envío.** Recomienda un subdominio dedicado (`news.<dominio>`), distinto de los tres de la instalación (dns.md §3).
 4. **Región de SES.** La de la cuenta de AWS. Se usa la misma en todo.
 5. **Buzón para respuestas.** Plunk no recibe correo. Comprueba que la dirección de respuesta tiene un buzón que funcione (using-plunk.md §7).
+6. **Imagen oficial o Plunk Lite.** Por defecto se usa la imagen oficial de Plunk con el arranque recortado del compose. Plunk Lite es un fork ligero y no oficial, con Node 24, la mitad de tamaño y arreglos que la oficial aún no tiene, pero sin relay SMTP. Explícalo en una frase y pregúntalo solo si a la persona le importan la memoria, la seguridad de Node o esos arreglos (references/plunk-lite.md §2-3).
 
 ## Fase 1: Desplegar en Dokploy
 
@@ -55,6 +56,7 @@ Pregunta solo lo que no sepas ya:
 2. Crea el compose en el proyecto de Dokploy que diga la persona: tipo docker-compose, origen raw y nombre `plunk`.
 3. Actualiza el compose con el contenido de `assets/docker-compose.yml` y con **isolatedDeployment activado**. Así Postgres y Redis quedan en una red privada que solo ve Plunk.
    - El compose ya fija la versión de Plunk. Si hay una más nueva, sigue antes operations.md §3.
+   - Con Plunk Lite, cambia antes la imagen y quita el bloque `entrypoint`/`command` (references/plunk-lite.md §4).
    - Postgres y Redis van dentro del compose a propósito: aislamiento, arranque en orden (Plunk migra la base al arrancar) y un solo bloque que desplegar.
 4. Guarda el env con el contenido de `plunk.env`. Ahora sí puedes hacerlo por la API, porque aún no hay claves de AWS.
 5. Crea los tres dominios, con HTTPS, Let's Encrypt y path `/`:
@@ -70,7 +72,7 @@ Pregunta solo lo que no sepas ya:
 
 **Verificación:**
 - El despliegue termina bien y el contenedor `plunk` queda healthy (tarda hasta 90 s en el primer arranque).
-- En el log del contenedor `plunk` sale `Plunk: arrancando nginx, api, worker, web`.
+- En el log del contenedor `plunk` sale `Plunk: arrancando nginx, api, worker, web`. Con Plunk Lite esa línea no sale: se comprueba como en references/plunk-lite.md §4.
 - `https://envio-api.<dominio>/health` responde 200.
 - `https://envio.<dominio>` muestra el login.
 
@@ -144,6 +146,7 @@ Propón estos ajustes y explica cada uno en una frase. Los cambios de env los ha
 - **Enviar desde una web, eventos y workflows, MCP de Plunk:** references/using-plunk.md.
 - **Usar Plunk desde claude.ai (MCP remoto con login de GitHub):** references/mcp-remote.md y `assets/mcp-remoto/`. Lee antes la §5: claude.ai no puede mostrar la confirmación de envíos de Plunk.
 - **Actualizar, memoria, MinIO/R2, ntfy, cambiar de dominio, segunda instalación:** references/operations.md.
+- **Plunk Lite (desplegar, actualizar o volver a la oficial):** references/plunk-lite.md.
 - **Algo falla:** references/troubleshooting.md.
 
 ## Lo que más cuesta aprender

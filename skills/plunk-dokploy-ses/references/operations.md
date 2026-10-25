@@ -38,7 +38,7 @@ El compose sustituye `entrypoint`/`command` del servicio `plunk`: copia el scrip
 
 ## 3. Actualizar Plunk
 
-La versión está fijada en el compose (`image: ghcr.io/useplunk/plunk:0.17.0`), así que actualizar es un cambio del compose, no del env.
+La versión está fijada en el compose (`image: ghcr.io/useplunk/plunk:0.17.0`), así que actualizar es un cambio del compose, no del env. Con Plunk Lite, sigue references/plunk-lite.md §5.
 
 1. Lee las notas de versión entre la versión actual y la nueva (https://github.com/useplunk/plunk/releases): migraciones, variables nuevas, cambios de comportamiento.
 2. Comprueba que el parche de arranque sigue aplicando. Con Docker en cualquier máquina:
