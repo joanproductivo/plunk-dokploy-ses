@@ -48,7 +48,7 @@ Después pídele a Claude, por ejemplo: «Instala Plunk en mi Dokploy con AWS SE
 skills/plunk-dokploy-ses/
 ├── SKILL.md       las fases, de decidir a mantener
 ├── references/    AWS SES, DNS, uso de Plunk, MCP remoto, operaciones, Plunk Lite y problemas frecuentes
-├── scripts/       configuración y comprobación de SES, comprobación de DNS, generación del env
+├── scripts/       configuración y comprobación de SES, comprobación de DNS, generación del env, última versión de Plunk Lite
 └── assets/        compose de Plunk y del MCP remoto, plantillas de env
 ```
 

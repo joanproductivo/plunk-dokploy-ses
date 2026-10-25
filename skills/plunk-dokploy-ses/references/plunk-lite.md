@@ -43,14 +43,19 @@ Explica las dos opciones en una frase cada una y deja elegir a la persona. Si du
 
 ## 4. Desplegar con Plunk Lite
 
-Sigue la Fase 1 de SKILL.md con dos cambios en `assets/docker-compose.yml`, antes de crear el compose en Dokploy:
+Sigue la Fase 1 de SKILL.md con estos cambios en `assets/docker-compose.yml`, antes de crear el compose en Dokploy:
 
-1. Cambia la imagen del servicio `plunk` por la de Plunk Lite, con una etiqueta concreta:
-   ```yaml
-   image: ghcr.io/joanproductivo/plunk-lite:sha-4f7a055
+1. Averigua cuál es hoy la última Plunk Lite:
+   ```bash
+   python3 scripts/plunk_lite_latest.py
    ```
-   Plunk Lite solo publica etiquetas `sha-<commit>`, no versiones con nombre ni `latest`. Así la versión queda fijada igual que con la oficial. Para ver si hay una más nueva, mira la página del paquete: https://github.com/joanproductivo/plunk-lite/pkgs/container/plunk-lite
-2. Borra el bloque `entrypoint`/`command` del servicio `plunk`, con sus tres líneas de comentario. La imagen ya arranca solo lo necesario. Si se deja, no rompe nada, pero sobra.
+   Imprime la etiqueta para el compose (`ghcr.io/joanproductivo/plunk-lite:sha-<commit>`), el commit y la fecha de compilación. No necesita Docker ni credenciales. Sin Python, la misma información está en la página del paquete: https://github.com/joanproductivo/plunk-lite/pkgs/container/plunk-lite
+2. Pon esa etiqueta en la imagen del servicio `plunk`:
+   ```yaml
+   image: ghcr.io/joanproductivo/plunk-lite:sha-<commit>
+   ```
+   Plunk Lite publica cada versión como `sha-<commit>` y, además, la más reciente como `latest` (sale de la rama `plunk-lite` del repositorio). En el compose usa siempre la `sha-<commit>`, no `latest`: con `latest`, cualquier despliegue o reinicio del servidor podría cambiar de versión sin que nadie lo decida y sin copia previa de la base de datos.
+3. Borra el bloque `entrypoint`/`command` del servicio `plunk`, con sus tres líneas de comentario. La imagen ya arranca solo lo necesario. Si se deja, no rompe nada, pero sobra.
 
 El resto no cambia: el env, MinIO o R2, los dominios, SES y el DNS.
 
@@ -62,7 +67,7 @@ El resto no cambia: el env, MinIO o R2, los dominios, SES y el DNS.
 
 ## 5. Actualizar
 
-1. Busca la etiqueta más reciente en la página del paquete (sección 4) y lee en el repositorio qué cambió desde la que hay instalada.
+1. Ejecuta `python3 scripts/plunk_lite_latest.py` (sección 4). Si la etiqueta coincide con la del compose, ya está al día. Si no, lee en el repositorio qué cambió entre los dos commits: `https://github.com/joanproductivo/plunk-lite/compare/<commit instalado>...<commit nuevo>`.
 2. Haz una copia de Postgres (operations.md §5).
 3. Cambia la etiqueta de la imagen en el compose y despliega.
 4. Verifica como en la sección 4. Si algo falla, vuelve a la etiqueta anterior con el mismo compose.

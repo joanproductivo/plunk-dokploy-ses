@@ -56,7 +56,7 @@ Pregunta solo lo que no sepas ya:
 2. Crea el compose en el proyecto de Dokploy que diga la persona: tipo docker-compose, origen raw y nombre `plunk`.
 3. Actualiza el compose con el contenido de `assets/docker-compose.yml` y con **isolatedDeployment activado**. Así Postgres y Redis quedan en una red privada que solo ve Plunk.
    - El compose ya fija la versión de Plunk. Si hay una más nueva, sigue antes operations.md §3.
-   - Con Plunk Lite, cambia antes la imagen y quita el bloque `entrypoint`/`command` (references/plunk-lite.md §4).
+   - Con Plunk Lite, cambia antes la imagen por la última `sha-<commit>`, que da `scripts/plunk_lite_latest.py`, y quita el bloque `entrypoint`/`command` (references/plunk-lite.md §4).
    - Postgres y Redis van dentro del compose a propósito: aislamiento, arranque en orden (Plunk migra la base al arrancar) y un solo bloque que desplegar.
 4. Guarda el env con el contenido de `plunk.env`. Ahora sí puedes hacerlo por la API, porque aún no hay claves de AWS.
 5. Crea los tres dominios, con HTTPS, Let's Encrypt y path `/`:
