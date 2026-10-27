@@ -34,7 +34,7 @@ Y añade funciones que la oficial no tiene:
 - **Segmentos estáticos.** Lanzan eventos de entrada y salida que pueden arrancar workflows, y se gestionan en bloque desde Contactos, desde la ficha de cada contacto y desde los workflows (paso «Update contact» y condición de pertenencia). Se pueden borrar varios a la vez, salvo los que usa otro segmento o una campaña activa.
 - **Avisos.** Un banner en el panel y emails a las direcciones de Settings → Alerts cuando un email no se puede enviar, cuando falla una campaña o un workflow, cuando el proyecto se desactiva, cuando la tasa de rebotes o quejas se acerca a los límites de AWS y cuando SES deja de verificar un dominio.
 
-Estas funciones guardan sus datos en cinco tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 6).
+Estas funciones guardan sus datos en seis tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 6).
 
 También es más segura al enviar en volumen. Revisada en octubre de 2026 antes de campañas de miles de emails:
 
@@ -49,6 +49,14 @@ También es más segura al enviar en volumen. Revisada en octubre de 2026 antes 
 - **Rebotes de alias y reenvíos.** Dan de baja al contacto aunque SES nombre la dirección final.
 - **Rebotes y avisos (lote E2).** Cada envío lleva etiquetas de SES: un rebote o una queja encuentra su email aunque falte el `messageId`, y se suprime la dirección aunque no haya fila. Frenos por fuente (campaña cancelada, workflow desactivado) y el proyecto solo como último recurso; botón para reactivarlo con 7 días de gracia. Avisos también con el proyecto desactivado, comprobación cada 15 min de que llegan los eventos de SES, y alarmas de CloudWatch en el banner si su topic se suscribe al webhook. Borrar contactos no baja las tasas (tabla propia `plunk_lite_deleted_email_counts`).
 - **Revisión del lote E2.** Los contactos borrados se cuentan por minuto (reactivar y limpiar la lista no vuelve a desactivar), la comprobación de reputación no pierde avisos y se acota sin Redis, y el mensaje de prueba de SES y el topic `plunk-alarmas` no dan avisos falsos.
+- **API y plataforma (lote E4).**
+  - **Límites de la API pública:** `data` de hasta 32 KB y 6 niveles, de 1 a 50 destinatarios por `/v1/send`, 200 campos y 64 KB por contacto, y lo que Postgres no puede guardar da 422 en vez de 500.
+  - **`/v1/send` con varios destinatarios** responde 207 con `failed` en vez de cortarse en el primero que falla.
+  - **Altas verificadas** (`PLUNK_LITE_VERIFY_SIGNUPS`, activado). Un contacto nuevo por la API recibe 422 `INVALID_EMAIL`, con la dirección sugerida, si su dominio no existe, no recibe correo, es desechable o es una errata de un gran proveedor (`gmial.com`). Ante la duda del DNS, la deja pasar.
+  - **`PLUNK_LITE_PUBLIC_TRACK=off`** apaga `/v1/track`, la única ruta de la clave pública.
+  - **Proyectos y claves:** un proyecto desactivado o con las claves regeneradas se nota al instante, y las claves inventadas no llegan a la base de datos.
+  - **Menos carga:** `api_requests` escribe menos y está acotado; los CSV de importación no se quedan en Redis.
+  - **Arranque:** la API se reinicia sola si no arranca, y hay un aviso si Redis se acerca a su techo de memoria.
 - **Protección CSRF.** Las peticiones de escritura con la cookie del panel solo se aceptan si su `Origin` es el panel.
 - **Lista de supresión propia.** Guarda las direcciones con un rebote permanente o una queja, y las que una importación marca como `bounced`, `cleaned` o `complained` (como el CSV de Flodesk). Nunca se les envía nada, tampoco transaccionales, y nada las vuelve a suscribir: un evento, un envío o una importación las deja dadas de baja, y una petición explícita (dar de alta el contacto desde el panel o marcarlo como suscrito) responde 409 `ADDRESS_SUPPRESSED`. Solo la ficha del contacto en el panel, o la propia persona desde un email que recibió, levantan la supresión.
 - **Reenviar una campaña cancelada.** Tras cancelar, ningún lote del envío anterior crea más emails, y la campaña solo vuelve a borrador cuando ya no le queda ninguno. Si SES pudo aceptar alguno de los que fallaron, se queda cancelada para no enviar dos veces. Reprogramar una campaña cambia de verdad su hora.
@@ -98,7 +106,7 @@ El resto no cambia: el env (con las variables `S3_*` del bucket), los dominios, 
 
 1. Ejecuta `python3 scripts/plunk_lite_latest.py` (sección 4). Si la etiqueta coincide con la del compose, ya está al día. Si no, lee en el repositorio qué cambió entre los dos commits: `https://github.com/joanproductivo/plunk-lite/compare/<commit instalado>...<commit nuevo>`.
 2. Haz una copia de Postgres (operations.md §5).
-3. Cambia la etiqueta de la imagen en el compose y despliega.
+3. Cambia la etiqueta de la imagen en el compose y despliega. Si cambian también los `command` de Postgres o Redis (como en la versión con el lote E4), Docker los recrea y la instalación se corta alrededor de un minuto: despliega fuera de una campaña.
 4. Verifica como en la sección 4. Si algo falla, vuelve a la etiqueta anterior con el mismo compose.
 
 ## 6. Volver a la imagen oficial
@@ -108,6 +116,7 @@ Antes, avisa de lo que se pierde si se han usado las funciones propias (sección
 - **Emails hechos con el editor de Plunk Lite.** La oficial ignora la marca, el preheader y los pies propios. El botón, el divisor, el espaciador, los vídeos y las cajas con fondo pueden verse peor, sobre todo en Outlook, y el editor oficial abre como HTML los emails con cajas. Revisa las plantillas y las campañas que se vayan a reutilizar.
 - **Workflows con segmentos estáticos.** En la oficial, los segmentos estáticos dejan de lanzar sus eventos de entrada y salida, así que los workflows que arrancan con ellos se quedan parados. Además, un paso «Update contact» que solo cambia segmentos hace fallar la ejecución, y una condición de pertenencia a segmento va siempre por «no».
 - **Avisos.** Dejan de llegar.
+- **API.** Un `/v1/send` con varios destinatarios vuelve a cortarse en el primero que falla (sin 207), las altas con un email que no recibe correo vuelven a entrar, y las variables `PLUNK_LITE_*` se ignoran.
 - **Lista de supresión propia.** La oficial no la conoce: una importación o una llamada a `/v1/track` puede volver a suscribir a quien rebotó o se quejó. La supresión de la cuenta de SES sigue bloqueando esos envíos, pero cuentan como intentos. Antes de importar contactos, quita esas direcciones del CSV.
 
 Los datos no se borran: quedan en las tablas `plunk_lite_*` y vuelven a usarse si se regresa a Plunk Lite.

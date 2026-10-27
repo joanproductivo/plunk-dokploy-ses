@@ -21,6 +21,10 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    # Las consultas de más de 5 s van al log de este contenedor, para medir antes de ajustar nada; sin sus
+    # parámetros ni el detalle de los errores (emails, datos de contactos). Cambiar este command, como el de
+    # Redis, recrea el contenedor al desplegar: hazlo fuera de una campaña.
+    command: postgres -c log_min_duration_statement=5000 -c log_parameter_max_length=0 -c log_error_verbosity=terse
     environment:
       POSTGRES_DB: plunk
       POSTGRES_USER: plunk
@@ -41,7 +45,9 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    command: redis-server --appendonly yes
+    # Techo de memoria para que Redis no se coma la del servidor; noeviction es lo que pide BullMQ (lleno,
+    # rechaza escrituras). Plunk Lite avisa a los proyectos al 80 %. Una instalación normal usa decenas de MB.
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-1gb} --maxmemory-policy noeviction
     volumes:
       - redis_data:/data
     healthcheck:
@@ -119,6 +125,9 @@ services:
       SES_CONFIGURATION_SET_NO_TRACKING: ${SES_CONFIGURATION_SET_NO_TRACKING}
       MAIL_FROM_SUBDOMAIN: ${MAIL_FROM_SUBDOMAIN:-}
       EMAIL_RATE_LIMIT_PER_SECOND: ${EMAIL_RATE_LIMIT_PER_SECOND:-}
+      # Emails que el worker envía a la vez, fijo: derivado de la cuota de SES crecería solo si AWS la sube
+      # y agotaría el pool de 15 conexiones de arriba junto con los demás workers
+      EMAIL_WORKER_CONCURRENCY: ${EMAIL_WORKER_CONCURRENCY:-8}
 
       GITHUB_OAUTH_CLIENT: ${GITHUB_OAUTH_CLIENT:-}
       GITHUB_OAUTH_SECRET: ${GITHUB_OAUTH_SECRET:-}
@@ -149,6 +158,11 @@ services:
       # Límite por proyecto en la API pública (track 100/s, send 20/s, contactos 50/s); acota una
       # integración desbocada o una clave pk_ usada en un formulario web
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      # Plunk Lite: un contacto nuevo por la API cuyo dominio no existe, no recibe correo, es desechable o es una
+      # errata de un gran proveedor (gmial.com) recibe 422 con la dirección sugerida; false lo apaga
+      PLUNK_LITE_VERIFY_SIGNUPS: ${PLUNK_LITE_VERIFY_SIGNUPS:-true}
+      # Plunk Lite: off apaga /v1/track (la única ruta de la clave pk_) con 403, si nada lo usa desde un navegador
+      PLUNK_LITE_PUBLIC_TRACK: ${PLUNK_LITE_PUBLIC_TRACK:-on}
     volumes:
       - plunk_data:/app/data
     depends_on:
@@ -157,7 +171,8 @@ services:
       plunk-redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
+      # /health de la API (el servidor por defecto de nginx): un 200 real, no la redirección de /
+      test: ["CMD-SHELL", "curl -fsS http://localhost:80/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

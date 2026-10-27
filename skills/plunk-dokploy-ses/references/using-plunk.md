@@ -47,6 +47,8 @@ Muchas plataformas (webs de cursos, comunidades, formularios) permiten enviar su
 - `from.email` debe estar en un **dominio de envío verificado** (no en la raíz si solo está verificado un subdominio).
 - `reply` debe ser un **buzón que exista**: Plunk no recibe correo, y sin `reply` las respuestas irían a la dirección de envío, que normalmente no tiene buzón. Comprueba que el dominio del buzón tiene MX y un servidor que responda.
 - El HTML va dentro de una cadena JSON: la plataforma tiene que escapar comillas y saltos de línea al insertar `{{html}}`. Si no lo hace, Plunk responde 400.
+- `to` admite de 1 a 50 destinatarios.
+- **Altas con un email que no recibe correo (Plunk Lite).** Un destinatario que aún no es contacto se rechaza con 422 `INVALID_EMAIL` si su dominio no existe, no recibe correo, es desechable o es una errata de un gran proveedor (`gmial.com`). `error.details` trae `reasons` y, si la hay, `suggestedEmail` (`ana@gmail.com`). **El formulario tiene que tratar ese 422** y pedir la dirección otra vez, ofreciendo la sugerida. Ante una duda del DNS la deja pasar; un buzón que no existe en un dominio real no se detecta. `PLUNK_LITE_VERIFY_SIGNUPS=false` lo apaga.
 - Quien recibe un transaccional queda como contacto **no suscrito** a marketing. Si hay consentimiento explícito para el boletín, añade `"subscribed": true` solo en ese caso.
 - En el sandbox de SES solo llega a direcciones verificadas o al simulador (`success@simulator.amazonses.com`).
 
@@ -55,6 +57,8 @@ Muchas plataformas (webs de cursos, comunidades, formularios) permiten enviar su
 | Código | Significa |
 |---|---|
 | 200 con `"success": true` | Aceptado (la entrega se ve después en el log como `Delivery confirmed`) |
+| 207 (Plunk Lite, varios destinatarios) | Se envió a algunos; `data.failed` lista los demás con `{email, code, message, suggestedEmail?}`. No reintentes con la misma `Idempotency-Key` (da 409) ni reenvíes a los que salieron |
+| 422 `INVALID_EMAIL` (Plunk Lite) | El destinatario nuevo no puede recibir correo; muestra el mensaje y `details.suggestedEmail` |
 | 401 | Clave mala, o se usó `pk_` en vez de `sk_` |
 | 422 `Request validation failed` | Falta un campo o llega vacío (el detalle dice cuál: p. ej. `subject: String must contain at least 1 character(s)`) |
 | 400 | JSON inválido, casi siempre HTML sin escapar |
@@ -74,7 +78,9 @@ Authorization: Bearer pk_…
 - `event` es texto libre: el primer envío lo crea. No hay lista que elegir.
 - **`subscribed`: si no se incluye, Plunk suscribe a la persona a marketing.** Para eventos como registro o login sin consentimiento de boletín, envía siempre `"subscribed": false`.
 - Con Plunk Lite, una dirección de su lista de supresión (rebote permanente o queja) no se vuelve a suscribir aunque el evento diga `"subscribed": true`: el contacto sigue dado de baja y no recibe nada, tampoco por `/v1/send`. Volver a suscribirla de forma explícita (por ejemplo, marcar el contacto como suscrito) da 409 `ADDRESS_SUPPRESSED`; no hay que reintentarlo.
-- `data` guarda datos del contacto para usarlos en los emails.
+- `data` guarda datos del contacto para usarlos en los emails (con Plunk Lite, hasta 32 KB y 6 niveles por petición).
+- Con Plunk Lite, un contacto nuevo con un email que no recibe correo da 422 `INVALID_EMAIL` (igual que en `/v1/send`) y **el evento no se guarda**: el formulario debe pedir la dirección otra vez.
+- **La clave `pk_` es pública:** quien la lea en una página puede dar altas. Si el formulario llama desde su servidor, mejor `POST /contacts` y `POST /events/track` (con `contactId`) con la `sk_`, y con Plunk Lite `PLUNK_LITE_PUBLIC_TRACK=off` para apagar `/v1/track`.
 - En el workflow, disparador **Event** con el **mismo nombre exacto** (distingue mayúsculas y espacios). Los workflows también pueden arrancar a mano (API) o por calendario.
 - Eventos reservados que genera Plunk (sirven de disparador pero no se pueden enviar con `/v1/track`): `email.sent`, `email.delivery`, `email.open`, `email.click`, `email.bounce`, `email.complaint`, `contact.subscribed`, `contact.unsubscribed`, `segment.<nombre>.entry`, `segment.<nombre>.exit`. Evita automatizar sobre `email.open` por las aperturas falsas.
 
