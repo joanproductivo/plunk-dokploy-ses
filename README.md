@@ -7,7 +7,7 @@ Skill para Claude que despliega y configura [Plunk](https://github.com/useplunk/
 ## Qué hace
 
 - Despliega un compose de Plunk probado y recortado en memoria (unos 190 MB en lugar de 330 MB).
-- Permite elegir entre la imagen oficial de Plunk y [Plunk Lite](https://github.com/joanproductivo/plunk-lite), un fork ligero y no oficial (Node 24, la mitad de tamaño, sin relay SMTP).
+- Permite elegir entre la imagen oficial de Plunk y [Plunk Lite](https://github.com/joanproductivo/plunk-lite), un fork ligero y no oficial (Node 24, la mitad de tamaño, editor de emails ampliado, segmentos estáticos con eventos y avisos de fallos, sin relay SMTP).
 - Configura los dominios con Traefik y Let's Encrypt.
 - Prepara AWS SES: un usuario IAM con permisos mínimos (solo desde la IP del servidor), los configuration sets y el topic SNS que lleva los eventos a Plunk.
 - Te guía con los registros DNS del dominio de envío, incluidas las trampas de Cloudflare.
