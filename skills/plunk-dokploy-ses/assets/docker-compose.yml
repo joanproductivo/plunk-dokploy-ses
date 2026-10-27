@@ -53,6 +53,10 @@ services:
   plunk:
     image: ghcr.io/useplunk/plunk:0.17.0
     restart: unless-stopped
+    # Margen para que Plunk termine lo que tiene en curso al parar: con los 10 s por defecto de
+    # Docker, un despliegue a mitad de una campaña cortaba envíos y lotes. Plunk Lite espera hasta
+    # 30 s (pm2 kill_timeout); con la imagen oficial no estorba.
+    stop_grace_period: 45s
     logging:
       driver: json-file
       options:
@@ -129,7 +133,7 @@ services:
       PLUNK_API_KEY: ${PLUNK_API_KEY:-}
       PLUNK_FROM_ADDRESS: ${PLUNK_FROM_ADDRESS:-}
 
-      AUTO_PROJECT_DISABLE: ${AUTO_PROJECT_DISABLE:-false}
+      AUTO_PROJECT_DISABLE: ${AUTO_PROJECT_DISABLE:-true}
       DISABLE_SIGNUPS: ${DISABLE_SIGNUPS:-false}
       SHOW_SPONSOR: ${SHOW_SPONSOR:-false}
       # Límite por proyecto en la API pública; actívalo cuando uses la clave pk_ en formularios web

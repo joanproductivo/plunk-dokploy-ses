@@ -27,6 +27,16 @@ La imagen se publica en `ghcr.io/joanproductivo/plunk-lite`, es pública y tiene
 
 Además lleva arreglos de fallos que la oficial aún no tiene. Por ejemplo, las aperturas automáticas que SES marca como tales ya no cuentan, las tasas del dashboard son correctas y se pueden alinear imágenes en el editor. La lista completa está en los commits del repositorio.
 
+También es más segura al enviar en volumen. Revisada en octubre de 2026 antes de campañas de miles de emails:
+
+- **Rebotes y quejas.** No se pierden (el webhook pide a SNS que reintente si falla) ni se cuentan dos veces.
+- **Reintentos de envío.** Un email que SES no aceptó se reintenta, y uno que aceptó nunca se reenvía.
+- **Suscripción.** Se vuelve a comprobar justo antes de enviar.
+- **Campañas.** Repetir un lote o pulsar dos veces «Enviar» no duplica emails.
+- **Tasa de rebotes.** Se mide sobre lo enviado y corta donde AWS revisa la cuenta (5 % de rebotes, 0,1 % de quejas).
+- **Emails atascados.** Un barrido los cierra sin enviar nada dos veces.
+- **Apagado.** El api y el worker tienen hasta 30 s para terminar lo que tienen en curso.
+
 ## 3. Cuándo recomendarla y cuándo no
 
 **Recomiéndala** si la persona:

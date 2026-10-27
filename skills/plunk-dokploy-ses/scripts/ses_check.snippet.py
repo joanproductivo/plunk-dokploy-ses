@@ -33,6 +33,7 @@ summary = {
     "rate_per_second": quota.get("MaxSendRate"),
     "sent_last_24h": quota.get("SentLast24Hours"),
     "pricing_plan": pricing.get("CurrentPlan"),
+    "suppressed_reasons": account.get("SuppressionAttributes", {}).get("SuppressedReasons"),
 }
 
 listed = await call_boto3(service_name="sesv2", operation_name="ListEmailIdentities", region_name=R)
@@ -73,8 +74,19 @@ try:
     subs = await call_boto3(service_name="sns", operation_name="ListSubscriptionsByTopic", region_name=R,
                             params={"TopicArn": topic_arn})
     subscriptions = [{"endpoint": s.get("Endpoint"), "protocol": s.get("Protocol"),
+                      "arn": s.get("SubscriptionArn"),
                       "confirmed": s.get("SubscriptionArn") not in ("PendingConfirmation", "Deleted")}
                      for s in subs.get("Subscriptions", [])]
+    for sub in subscriptions:
+        if not sub["confirmed"]:
+            continue
+        attrs = (await call_boto3(service_name="sns", operation_name="GetSubscriptionAttributes", region_name=R,
+                                  params={"SubscriptionArn": sub.pop("arn")})).get("Attributes", {})
+        effective = json.loads(attrs.get("EffectiveDeliveryPolicy") or "{}")
+        sub["retries"] = effective.get("healthyRetryPolicy", {}).get("numRetries")
+        sub["dlq"] = json.loads(attrs["RedrivePolicy"]).get("deadLetterTargetArn") if attrs.get("RedrivePolicy") else None
+    for sub in subscriptions:
+        sub.pop("arn", None)
 except Exception as e:
     subscriptions = err(e)
 

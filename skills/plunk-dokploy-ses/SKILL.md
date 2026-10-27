@@ -100,6 +100,7 @@ Lee references/aws-ses.md. En resumen:
    - El log de `plunk` muestra `AWS SES quota: 1 emails/second (0/200 emails sent today)`. Eso es el sandbox: las claves funcionan.
    - En la tabla de arranque, `File uploads (S3)` sale `✅`. Con R2 sale además `[S3] Failed to set bucket policy: NotImplemented`: es esperado e inofensivo (R2 no admite esa operación; el bucket ya es público por su dominio propio). Prueba de verdad: la persona sube una imagen en el editor y la URL `https://envio-files.<dominio>/…` se abre desde fuera.
    - `scripts/ses_check.snippet.py` da la suscripción confirmada y una access key activa.
+   - Con la suscripción ya confirmada, ejecuta `ses_setup` otra vez: pone los 40 reintentos y la DLQ de la suscripción, que no se pueden poner antes. `ses_check` debe dar `retries: 40`, `dlq` con la cola y `suppressed_reasons` con BOUNCE y COMPLAINT (aws-ses.md §10).
 4. **Plan de precios.** Las cuentas nuevas de SES llegan en Essentials (0,16 $ por 1.000 emails). À la carte cuesta 0,10 $ y Plunk ya da las métricas que añade Essentials. Explica la diferencia y cámbialo solo si la persona quiere (aws-ses.md §7).
 
 ## Fase 3: Dominio de envío
@@ -135,6 +136,8 @@ Si AWS pide más información o la deniega, **no la reenvíes**. La persona resp
 
 Cuando AWS la conceda, **reinicia el contenedor `plunk`**: Plunk lee la cuota de SES solo al arrancar. En el log debe salir la cuota nueva, por ejemplo `14 emails/second (0/50000…)`.
 
+Después, pide a la persona que ponga `EMAIL_RATE_LIMIT_PER_SECOND` un poco por debajo de esa cuota (por ejemplo, `12` con 14/s) en la pestaña Environment, para no rozar el límite de SES.
+
 ## Fase 5: Ajustes recomendados
 
 Propón estos ajustes y explica cada uno en una frase. Los cambios de env los hace la persona.
@@ -143,6 +146,8 @@ Propón estos ajustes y explica cada uno en una frase. Los cambios de env los ha
 - **Platform emails.** `PLUNK_API_KEY` + `PLUNK_FROM_ADDRESS`; sin ellos, "He olvidado mi contraseña" no envía nada.
 - **`RATE_LIMIT_ENABLED=true`** cuando una web use la clave `pk_` en un formulario público.
 - **Copia diaria de Postgres** a un destino S3/R2 desde Dokploy (operations.md §5).
+- **`AUTO_PROJECT_DISABLE=true`** (ya viene así en el env generado). Un proyecto cuya tasa de rebotes o quejas llega al crítico deja de enviar antes de que AWS revise la cuenta entera. Si la persona lo quiere apagar, que sepa que entonces solo recibe avisos.
+- **No desplegar durante una campaña.** El compose da 45 s para terminar lo que está en curso, pero un despliegue en mitad de un envío grande sigue siendo un riesgo innecesario.
 - **Aperturas.** Avisa de que Gmail, Apple y los antivirus generan aperturas falsas: los clics son la métrica fiable (using-plunk.md §4).
 
 ## Después: integrar y mantener
@@ -166,3 +171,6 @@ Cada punto salió de un error real:
 - **`/v1/track` suscribe al contacto si no se le dice `"subscribed": false`.**
 - **Un dominio de envío solo puede estar en un proyecto de Plunk.** Si lo borras, SES genera tokens DKIM nuevos.
 - **Cambiar la IP del servidor rompe los envíos.** La política de IAM está atada a esa IP.
+- **SNS reintenta solo 3 veces en un minuto por defecto.** Un despliegue o un reinicio más largo perdía rebotes y quejas, y con ellos las bajas. `ses_setup` sube los reintentos a unos 40 minutos y guarda lo que no llegue en una cola (aws-ses.md §10).
+- **La supresión de la cuenta de SES es la red de seguridad.** Bloquea a quien rebotó o se quejó en cualquier envío, también si la dirección vuelve a entrar con una importación. Comprueba que está activa (`ses_check`).
+- **Un envío grande no cabe en el sandbox.** Son 200 emails al día: hay que salir del sandbox antes de la primera campaña de verdad.

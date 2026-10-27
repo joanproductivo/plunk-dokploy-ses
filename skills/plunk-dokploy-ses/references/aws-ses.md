@@ -10,6 +10,7 @@
 7. Plan de precios de SES
 8. Después de cambios en la cuenta
 9. Quitar el seguimiento de aperturas
+10. Que no se pierdan rebotes ni quejas
 
 ## 1. Qué se crea y por qué
 
@@ -24,6 +25,9 @@
 | Configuration set | `plunk-configuration-set` | Eventos DELIVERY, OPEN, CLICK, BOUNCE, COMPLAINT → SNS (sin SEND: Plunk no lo usa) |
 | Configuration set | `plunk-no-tracking-configuration-set` | Igual, sin OPEN ni CLICK |
 | Suscripción HTTPS | `https://<API_DOMAIN>/webhooks/sns` | Plunk recibe los eventos y la confirma solo |
+| Reintentos de la suscripción | 40, de 10 a 100 s (~40 min) | Que un despliegue o un reinicio no pierda rebotes ni quejas (§10) |
+| Cola SQS | `plunk-ses-events-dlq` (14 días) | Lo que SNS no consiga entregar queda guardado en vez de perderse (§10) |
+| Supresión de la cuenta | BOUNCE y COMPLAINT | SES no vuelve a intentar direcciones que rebotaron o se quejaron (§10) |
 
 Las 8 acciones: `ses:SendRawEmail`, `ses:GetSendQuota`, `ses:VerifyDomainDkim`, `ses:GetIdentityDkimAttributes`, `ses:GetIdentityVerificationAttributes`, `ses:SetIdentityMailFromDomain`, `ses:SetIdentityFeedbackForwardingEnabled`, `ses:DeleteIdentity`. Plunk crea y borra las identidades de dominio él mismo cuando se añaden o quitan en su panel; por eso necesita las de identidad, además de enviar.
 
@@ -67,6 +71,9 @@ Una access key es un secreto: no debe pasar por el chat ni por las herramientas.
 | `identities.<dominio>.dkim` | `SUCCESS` | `PENDING`: DNS aún no visible o SES no ha recomprobado (puede tardar horas); `FAILED`: registros mal, ver references/dns.md |
 | `identities.<dominio>.mail_from_status` | `SUCCESS` | Revisa MX y TXT de `plunk.<dominio>` |
 | `sns_subscriptions[].confirmed` | `true` | Ver "Orden" en la sección 1 |
+| `sns_subscriptions[].retries` | `40` | `3` es el valor por defecto: ejecuta `ses_setup` otra vez con la suscripción ya confirmada (§10) |
+| `sns_subscriptions[].dlq` | la ARN de `plunk-ses-events-dlq` | Igual que la fila anterior |
+| `ses.suppressed_reasons` | `["BOUNCE", "COMPLAINT"]` | Ejecuta `ses_setup` otra vez (§10) |
 | `config_sets` | los dos, con `plunk-sns` habilitado | Ejecuta `ses_setup` otra vez |
 | `iam.access_keys` | una, `Active` | Ninguna: falta el paso 3. Dos: que la persona borre la que no usa |
 | `iam.allowed_ip` | IP actual del servidor | Ejecuta `ses_setup` con la IP nueva |
@@ -162,10 +169,25 @@ Si la cuenta está en el plan gratuito de AWS (cuentas nuevas con crédito), avi
 
 **Plunk lee la cuota de SES solo al arrancar.** Tras salir del sandbox (o tras un aumento de cuota), reinicia el contenedor `plunk` (reiniciar no toca el env). En el log debe aparecer la cuota nueva, p. ej. `AWS SES quota: 14 emails/second (0/50000 emails sent today)`. Si no lo reinicias, sigue enviando al ritmo del sandbox.
 
-No hace falta `EMAIL_RATE_LIMIT_PER_SECOND`: Plunk usa la cuota que lee de SES.
+Plunk usa la cuota que lee de SES. Antes de enviar en volumen, conviene fijar `EMAIL_RATE_LIMIT_PER_SECOND` un poco por debajo (§10).
 
 ## 9. Quitar el seguimiento de aperturas
 
 Gmail (proxy de imágenes), Apple Mail Privacy Protection y algunos antivirus descargan el píxel al recibir el email, y Plunk 0.17 cuenta eso como apertura (en las pruebas llegó 1–2 s después de la entrega). Está reportado en https://github.com/useplunk/plunk/issues/531. Si la persona prefiere no ver aperturas falsas, quita `OPEN` del configuration set principal y se queda con los clics, que sí son fiables:
 
 `sesv2:UpdateConfigurationSetEventDestination` en `plunk-configuration-set` / `plunk-sns` con `MatchingEventTypes: ["DELIVERY","CLICK","BOUNCE","COMPLAINT"]` (mantén `Enabled: true` y el mismo `SnsDestination`). Es reversible volviendo a añadir `OPEN`. Pide confirmación antes: cambia lo que mide la herramienta.
+
+## 10. Que no se pierdan rebotes ni quejas
+
+Las cuentas de SES se pueden suspender por una tasa de rebotes o de quejas alta, y Plunk solo da de baja a quien rebota o se queja si le llega el aviso. Tres ajustes, todos en `ses_setup`, cubren los huecos:
+
+- **Reintentos de SNS.** Por defecto, SNS reintenta un webhook HTTPS solo 3 veces en unos 60 s. Un despliegue o un reinicio de Plunk que tarde más pierde para siempre los rebotes y quejas de ese rato. La política de `ses_setup` sube a 40 reintentos, unos 40 minutos.
+- **Cola de mensajes no entregados (DLQ).** Si aun así SNS no consigue entregar un evento, lo deja 14 días en `plunk-ses-events-dlq` en lugar de tirarlo. Se ve en la consola de SQS.
+- **Supresión de la cuenta.** Con BOUNCE y COMPLAINT, SES no vuelve a intentar una dirección que rebotó o se quejó, aunque Plunk le mande un email (por ejemplo, tras reimportar una lista vieja): responde con un rebote `OnAccountSuppressionList` que no cuenta en la tasa de AWS. Suele venir activa en las cuentas nuevas. Si alguien la desactiva, esas direcciones vuelven a recibir.
+
+La suscripción tiene que estar confirmada para poner los reintentos y la DLQ: si `ses_setup` dice que aún no lo está, vuelve a ejecutarlo cuando `ses_check` la dé por confirmada.
+
+**Antes de enviar en volumen** (miles de emails), comprueba también:
+- **`EMAIL_RATE_LIMIT_PER_SECOND` un poco por debajo de la cuota.** Por ejemplo, `12` con 14/s, para no rozar el límite de SES.
+- **`AUTO_PROJECT_DISABLE=true`.** Así un proyecto con la tasa de rebotes o quejas en crítico deja de enviar antes de que AWS revise la cuenta entera.
+- **Que la cuenta ya salió del sandbox.** En el sandbox el límite es de 200 emails al día.

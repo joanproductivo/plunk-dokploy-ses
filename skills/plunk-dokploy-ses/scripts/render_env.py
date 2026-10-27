@@ -69,7 +69,7 @@ def main():
         ("S3_ACCESS_KEY_SECRET", ""),
         ("S3_PUBLIC_URL", f"https://{files}"),
         ("DISABLE_SIGNUPS", "false"),
-        ("AUTO_PROJECT_DISABLE", "false"),
+        ("AUTO_PROJECT_DISABLE", "true"),
         ("SHOW_SPONSOR", "false"),
     ]
     fd = os.open(a.out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

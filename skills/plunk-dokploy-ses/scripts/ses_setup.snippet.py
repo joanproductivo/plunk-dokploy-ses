@@ -11,6 +11,16 @@ SERVER_IP = "__SERVER_IP__/32"
 ENDPOINT = "https://__API_DOMAIN__/webhooks/sns"
 USER = "plunk-ses"
 TOPIC = "plunk-ses-events"
+DLQ = "plunk-ses-events-dlq"
+# SNS reintenta un webhook HTTPS solo 3 veces en ~60 s por defecto: un despliegue o un reinicio
+# de Plunk más largo perdía los rebotes y quejas de ese hueco. Con esta política, ~40 min.
+DELIVERY_POLICY = {
+    "healthyRetryPolicy": {
+        "minDelayTarget": 10, "maxDelayTarget": 100, "numRetries": 40,
+        "numNoDelayRetries": 0, "numMinDelayRetries": 5, "numMaxDelayRetries": 15,
+        "backoffFunction": "exponential",
+    }
+}
 CONFIG_SETS = {
     "plunk-configuration-set": ["DELIVERY", "OPEN", "CLICK", "BOUNCE", "COMPLAINT"],
     "plunk-no-tracking-configuration-set": ["DELIVERY", "BOUNCE", "COMPLAINT"],
@@ -106,6 +116,37 @@ if not any(s.get("Endpoint") == ENDPOINT for s in subs.get("Subscriptions", []))
     log.append(f"suscripción creada: {s.get('SubscriptionArn')}")
 else:
     log.append("suscripción ya existía")
+
+# 5. Que no se pierdan rebotes: reintentos largos en la suscripción y una cola (DLQ) con lo que
+#    SNS no consiga entregar, guardado 14 días. Solo sobre la suscripción ya confirmada.
+subs = await call_boto3(service_name="sns", operation_name="ListSubscriptionsByTopic", region_name=R, params={"TopicArn": topic_arn})
+sub_arn = next((s["SubscriptionArn"] for s in subs.get("Subscriptions", [])
+                if s.get("Endpoint") == ENDPOINT and s["SubscriptionArn"].startswith("arn:")), None)
+if sub_arn:
+    q = await call_boto3(service_name="sqs", operation_name="CreateQueue", region_name=R,
+        params={"QueueName": DLQ, "Attributes": {"MessageRetentionPeriod": "1209600", "SqsManagedSseEnabled": "true"}})
+    qa = await call_boto3(service_name="sqs", operation_name="GetQueueAttributes", region_name=R,
+        params={"QueueUrl": q["QueueUrl"], "AttributeNames": ["QueueArn"]})
+    dlq_arn = qa["Attributes"]["QueueArn"]
+    dlq_policy = {"Version": "2012-10-17", "Statement": [{
+        "Effect": "Allow", "Principal": {"Service": "sns.amazonaws.com"}, "Action": "sqs:SendMessage",
+        "Resource": dlq_arn, "Condition": {"ArnEquals": {"aws:SourceArn": topic_arn}}}]}
+    await call_boto3(service_name="sqs", operation_name="SetQueueAttributes", region_name=R,
+        params={"QueueUrl": q["QueueUrl"], "Attributes": {"Policy": json.dumps(dlq_policy)}})
+    await call_boto3(service_name="sns", operation_name="SetSubscriptionAttributes", region_name=R,
+        params={"SubscriptionArn": sub_arn, "AttributeName": "DeliveryPolicy", "AttributeValue": json.dumps(DELIVERY_POLICY)})
+    await call_boto3(service_name="sns", operation_name="SetSubscriptionAttributes", region_name=R,
+        params={"SubscriptionArn": sub_arn, "AttributeName": "RedrivePolicy",
+                "AttributeValue": json.dumps({"deadLetterTargetArn": dlq_arn})})
+    log.append(f"reintentos (40) y DLQ {DLQ} en la suscripción")
+else:
+    log.append("suscripción aún sin confirmar: vuelve a ejecutar el snippet cuando lo esté, para los reintentos y la DLQ")
+
+# 6. Lista de supresión de la cuenta: SES deja de intentar las direcciones que rebotaron o se
+#    quejaron, en cualquier envío (también los transaccionales). Suele venir activa; se asegura.
+await call_boto3(service_name="sesv2", operation_name="PutAccountSuppressionAttributes", region_name=R,
+    params={"SuppressedReasons": ["BOUNCE", "COMPLAINT"]})
+log.append("supresión de cuenta: BOUNCE y COMPLAINT")
 
 result = {"account": acct, "log": log, "topic_arn": topic_arn}
 result

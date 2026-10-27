@@ -57,6 +57,7 @@ La versión está fijada en el compose (`image: ghcr.io/useplunk/plunk:0.17.0`),
 - **Después, no.** Dokploy devuelve los secretos ocultos; al guardar, sobrescribirías las claves. Pide a la persona el cambio: compose → Environment → editar → Save → Deploy. Si alguna vez se pisan, la solución es que vuelva a pegar las claves.
 - Los cambios de env y de compose se aplican con **Deploy**. **Reiniciar** el contenedor no los aplica, pero sirve para que Plunk relea la cuota de SES.
 - Al quitar un servicio del compose y desplegar, Dokploy elimina su contenedor, pero sus volúmenes quedan. Bórralos solo si la persona lo confirma.
+- **No despliegues ni reinicies durante una campaña.** El compose da 45 s (`stop_grace_period`) para terminar lo que está en curso, y SNS reintenta los eventos unos 40 minutos si se aplicó `ses_setup` completo. Aun así, lo seguro es desplegar sin ninguna campaña enviándose ni programada para la próxima hora.
 
 ## 5. Copias de seguridad
 
