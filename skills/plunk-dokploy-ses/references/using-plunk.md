@@ -42,6 +42,7 @@ Muchas plataformas (webs de cursos, comunidades, formularios) permiten enviar su
 
 - **Los nombres de las variables (`{{email}}`, `{{asunto}}`, `{{html}}`) son los de la plataforma de la persona, no los de Plunk.** Pide la lista exacta o búscala en su panel: en un caso real la plataforma llamaba `{{asunto}}` al asunto y `{{subject}}` llegaba vacío.
 - `subject` y `body` son obligatorios (o un `template` de Plunk). Campos admitidos: `to`, `subject`, `body`, `from`, `reply`, `headers`, `data`, `subscribed`, `template`, `attachments`. Cualquier otro se ignora.
+- **Adjuntos: unos 7 MB en total como máximo.** El nginx de la imagen corta las peticiones de más de 10 MB, y los adjuntos van en base64, que ocupa un tercio más. SES admitiría hasta 40 MB, pero la petición no llega.
 - `from.email` debe estar en un **dominio de envío verificado** (no en la raíz si solo está verificado un subdominio).
 - `reply` debe ser un **buzón que exista**: Plunk no recibe correo, y sin `reply` las respuestas irían a la dirección de envío, que normalmente no tiene buzón. Comprueba que el dominio del buzón tiene MX y un servidor que responda.
 - El HTML va dentro de una cadena JSON: la plataforma tiene que escapar comillas y saltos de línea al insertar `{{html}}`. Si no lo hace, Plunk responde 400.
@@ -93,7 +94,7 @@ El selector solo aparece si existe `SES_CONFIGURATION_SET_NO_TRACKING` en el env
 Al arrancar, Plunk muestra una tabla de funciones. Dos suelen salir desactivadas:
 
 - **Platform emails**: los emails que Plunk envía al usuario del panel. Sin ellos, **"He olvidado mi contraseña" no envía nada** (la página dice que sí), ni llegan avisos de dominio verificado. Para activarlos: `PLUNK_API_KEY` (una clave `sk_` de un proyecto) y `PLUNK_FROM_ADDRESS` (remitente en un dominio verificado, p. ej. `no-reply@news.example.com`). Las añade la persona en Dokploy y redespliega.
-- **API rate limiting** (`RATE_LIMIT_ENABLED=true`): límite por proyecto en la API pública. Actívalo cuando una web use la clave `pk_` en un formulario, para acotar altas falsas masivas. Es por proyecto, no por visitante.
+- **API rate limiting** (`RATE_LIMIT_ENABLED`, activado por defecto en el compose): límite por proyecto en la API pública, que acota altas falsas masivas con la clave `pk_` o una integración desbocada. Es por proyecto, no por visitante.
 
 Si la persona olvida la contraseña sin Platform emails, se puede restablecer desde el servidor (en la base de datos), pero es más sencillo activarlos desde el principio.
 

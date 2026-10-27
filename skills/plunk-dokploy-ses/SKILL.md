@@ -144,7 +144,7 @@ Propón estos ajustes y explica cada uno en una frase. Los cambios de env los ha
 
 - **Email tracking → "Marketing only"** (Settings → General) si la web va a enviar accesos o códigos por Plunk. Así los antivirus no gastan los enlaces de un solo uso. Contrapartida: el porcentaje de aperturas y clics del dashboard sale más bajo de lo real; los datos fiables están en cada campaña y en Analytics por stream (using-plunk.md §4).
 - **Platform emails.** `PLUNK_API_KEY` + `PLUNK_FROM_ADDRESS`; sin ellos, "He olvidado mi contraseña" no envía nada.
-- **`RATE_LIMIT_ENABLED=true`** cuando una web use la clave `pk_` en un formulario público.
+- **Límite de peticiones** (`RATE_LIMIT_ENABLED`): viene activado en el compose. Solo hay que tocarlo si una integración propia pasa de 100 eventos o 20 envíos por segundo.
 - **Copia diaria de Postgres** a un destino S3/R2 desde Dokploy (operations.md §5).
 - **`AUTO_PROJECT_DISABLE=true`** (ya viene así en el env generado). Un proyecto cuya tasa de rebotes o quejas llega al crítico deja de enviar antes de que AWS revise la cuenta entera. Si la persona lo quiere apagar, que sepa que entonces solo recibe avisos.
 - **No desplegar durante una campaña.** El compose da 45 s para terminar lo que está en curso, pero un despliegue en mitad de un envío grande sigue siendo un riesgo innecesario.

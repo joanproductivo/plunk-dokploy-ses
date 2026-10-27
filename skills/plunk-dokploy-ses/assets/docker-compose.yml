@@ -57,6 +57,9 @@ services:
     # Docker, un despliegue a mitad de una campaña cortaba envíos y lotes. Plunk Lite espera hasta
     # 30 s (pm2 kill_timeout); con la imagen oficial no estorba.
     stop_grace_period: 45s
+    # Techo de memoria del contenedor, para que un proceso desbocado no tumbe el servidor ni a sus
+    # vecinos. Plunk Lite usa unos 200 MB en reposo y limita además el heap de api y worker dentro.
+    mem_limit: 2g
     logging:
       driver: json-file
       options:
@@ -89,7 +92,9 @@ services:
       SERVICE: all
       NODE_ENV: production
 
-      DATABASE_URL: postgresql://plunk:${DB_PASSWORD}@plunk-postgres:5432/plunk
+      # Pool de Prisma por proceso: 15 conexiones y 20 s de espera (por defecto, 2 por CPU + 1 y 10 s),
+      # para las ~30 tareas a la vez del worker en una campaña. Las migraciones usan DIRECT_DATABASE_URL
+      DATABASE_URL: postgresql://plunk:${DB_PASSWORD}@plunk-postgres:5432/plunk?connection_limit=15&pool_timeout=20
       DIRECT_DATABASE_URL: postgresql://plunk:${DB_PASSWORD}@plunk-postgres:5432/plunk
       REDIS_URL: redis://plunk-redis:6379
 
@@ -134,10 +139,12 @@ services:
       PLUNK_FROM_ADDRESS: ${PLUNK_FROM_ADDRESS:-}
 
       AUTO_PROJECT_DISABLE: ${AUTO_PROJECT_DISABLE:-true}
-      DISABLE_SIGNUPS: ${DISABLE_SIGNUPS:-false}
+      # Cerrado si el env no dice otra cosa: con las altas abiertas, cualquiera podría enviar con tu cuenta de SES
+      DISABLE_SIGNUPS: ${DISABLE_SIGNUPS:-true}
       SHOW_SPONSOR: ${SHOW_SPONSOR:-false}
-      # Límite por proyecto en la API pública; actívalo cuando uses la clave pk_ en formularios web
-      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
+      # Límite por proyecto en la API pública (track 100/s, send 20/s, contactos 50/s); acota una
+      # integración desbocada o una clave pk_ usada en un formulario web
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
     volumes:
       - plunk_data:/app/data
     depends_on:

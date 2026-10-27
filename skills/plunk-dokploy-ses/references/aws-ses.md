@@ -185,6 +185,8 @@ Las cuentas de SES se pueden suspender por una tasa de rebotes o de quejas alta,
 - **Cola de mensajes no entregados (DLQ).** Si aun así SNS no consigue entregar un evento, lo deja 14 días en `plunk-ses-events-dlq` en lugar de tirarlo. Se ve en la consola de SQS.
 - **Supresión de la cuenta.** Con BOUNCE y COMPLAINT, SES no vuelve a intentar una dirección que rebotó o se quejó, aunque Plunk le mande un email (por ejemplo, tras reimportar una lista vieja): responde con un rebote `OnAccountSuppressionList` que no cuenta en la tasa de AWS. Suele venir activa en las cuentas nuevas. Si alguien la desactiva, esas direcciones vuelven a recibir.
 
+**Reenviar a mano lo que haya en la DLQ:** los rebotes y las quejas se pueden reenviar siempre, porque Plunk no los registra dos veces. Las entregas, aperturas y clics, solo si tienen menos de 24 h: con Plunk Lite, pasado ese tiempo la cola de eventos ya no recuerda el mensaje, y se volverían a lanzar sus workflows y a sumar a los contadores. Con la imagen oficial, ni siquiera dentro de ese plazo.
+
 La suscripción tiene que estar confirmada para poner los reintentos y la DLQ: si `ses_setup` dice que aún no lo está, vuelve a ejecutarlo cuando `ses_check` la dé por confirmada.
 
 **Antes de enviar en volumen** (miles de emails), comprueba también:

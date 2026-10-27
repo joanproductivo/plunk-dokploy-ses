@@ -26,6 +26,13 @@ Medido con Plunk 0.17.0. El contenedor `plunk` lleva varios programas Node.js ge
 
 Contenedor: ~330 MB con todo, ~190 MB recortado. Además: Postgres ~98 MB y Redis ~7 MB. Una instalación completa recortada ronda los 300 MB (MinIO, si se monta, suma ~90 MB).
 
+Límites que pone la plantilla, para enviar en volumen sin tumbar el servidor:
+
+- **Memoria del contenedor `plunk`: 2 GB** (`mem_limit`). Un proceso desbocado, como una importación enorme, no se queda con la memoria de las demás aplicaciones del servidor. Plunk Lite limita además el heap de cada proceso (api 768 MB, worker 1 GB), y pm2 los reinicia de forma ordenada antes de llegar ahí.
+- **Postgres y Redis no llevan límite, a propósito.** Si a Postgres le falta memoria, reinicia todas sus conexiones a la vez. Redis guarda las colas de envío con `noeviction`: si le falta memoria, pierde trabajos.
+- **Conexiones a Postgres: 15 por proceso** (`?connection_limit=15&pool_timeout=20` en `DATABASE_URL`). Por defecto, Prisma abre 2 por CPU más 1 (9 con 4 CPU) y espera 10 s. Durante una campaña, el worker lleva unas 30 tareas a la vez y se quedaba corto. En total son unas 30 conexiones, muy por debajo de las 100 de Postgres. Las migraciones usan `DIRECT_DATABASE_URL`, sin límite.
+- **Redis 7 o más.** El contador de intentos de login de Plunk Lite usa `EXPIRE … NX`. La plantilla ya usa `redis:7-alpine`.
+
 Disco: Docker no limita por defecto el log de cada contenedor (el healthcheck ya escribe ~1 MB al día y cada email añade varias líneas). La plantilla lo deja en 3 ficheros de 10 MB por servicio (como mucho ~120 MB por instalación). Para comprobarlo, `HostConfig.LogConfig.Config` del contenedor (docker inspect, o `docker-getConfig` en el MCP de Dokploy) debe mostrar `max-size` y `max-file`; si sale vacío, el compose desplegado no lleva el bloque `logging`. Plunk guarda los eventos en Postgres, así que rotar el log no pierde nada importante.
 
 ## 2. Arranque recortado

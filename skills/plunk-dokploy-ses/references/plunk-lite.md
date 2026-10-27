@@ -36,6 +36,10 @@ También es más segura al enviar en volumen. Revisada en octubre de 2026 antes 
 - **Tasa de rebotes.** Se mide sobre lo enviado y corta donde AWS revisa la cuenta (5 % de rebotes, 0,1 % de quejas).
 - **Emails atascados.** Un barrido los cierra sin enviar nada dos veces.
 - **Apagado.** El api y el worker tienen hasta 30 s para terminar lo que tienen en curso.
+- **Envío a SES sin reintentos ocultos.** El SDK de AWS reintentaba por su cuenta un corte de conexión y podía duplicar un email que SES ya había aceptado. Ahora hay un solo intento, con tiempos límite, y solo se reintenta lo que SES rechazó o lo que nunca llegó a conectar.
+- **Rebotes de alias y reenvíos.** Dan de baja al contacto aunque SES nombre la dirección final.
+- **Eventos en cola.** Entregas, aperturas y clics los procesa el worker, 5 a la vez, en lugar del webhook. Una campaña grande ya no satura la base de datos, y las copias repetidas de SNS se descartan.
+- **Abuso.** Las peticiones tienen un tamaño máximo de 2 MB (10 MB en `/v1/send`, y solo 8 grandes a la vez), el login admite 10 intentos cada 15 minutos por email, y cada proceso tiene un techo de memoria.
 
 ## 3. Cuándo recomendarla y cuándo no
 

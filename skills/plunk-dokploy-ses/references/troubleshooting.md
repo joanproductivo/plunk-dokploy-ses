@@ -39,6 +39,10 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | 422 `Request validation failed` | Un campo llega vacío; a menudo la variable de la plataforma tiene otro nombre (`{{asunto}}` en vez de `{{subject}}`) | Lee el detalle de la respuesta y la lista de variables de la plataforma |
 | 400 en `/v1/send` | HTML sin escapar dentro del JSON | Que la plataforma escape `{{html}}` |
 | Rechazo del remitente | `from` fuera de un dominio verificado | Usa una dirección del dominio de envío |
+| 413 en `/v1/send` o en el panel | Petición de más de 10 MB (nginx) o, con Plunk Lite, de más de 2 MB fuera de `/v1/send` | Adjuntos de unos 7 MB como mucho; las imágenes, subidas al editor y no pegadas en base64 |
+| 503 «Too many large sends in progress» (Plunk Lite) | Más de 8 envíos grandes (más de 2 MB) a la vez | Reintenta tras el `Retry-After`; repártelos en el tiempo |
+| 429 «Too many login attempts» (Plunk Lite) | 10 intentos fallidos con ese email en 15 minutos | Espera 15 minutos; un login correcto pone la cuenta a cero |
+| 429 en `/v1/track`, `/v1/send` o contactos | Límite de peticiones por proyecto (`RATE_LIMIT_ENABLED`, activado en la plantilla) | Respeta `Retry-After`. Si una integración propia lo necesita de verdad, sube `RATE_LIMIT_*_PER_SECOND` en el env |
 | Emails marcados como abiertos sin abrir | Precarga del píxel por Gmail/Apple/antivirus | using-plunk.md §4 |
 | Enlaces de acceso que "ya se usaron" | El seguimiento de clics y los antivirus los abren antes | Tracking en "Marketing only" |
 | El dashboard marca un porcentaje de aperturas o clics más bajo que las campañas | Con tracking "Marketing only" o "Disabled", Plunk 0.17 cuenta en el total los emails sin seguimiento (useplunk/plunk#533) | Mira la página de la campaña o Analytics filtrado por stream (using-plunk.md §4) |
