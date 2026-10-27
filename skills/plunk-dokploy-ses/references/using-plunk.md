@@ -73,6 +73,7 @@ Authorization: Bearer pk_…
 
 - `event` es texto libre: el primer envío lo crea. No hay lista que elegir.
 - **`subscribed`: si no se incluye, Plunk suscribe a la persona a marketing.** Para eventos como registro o login sin consentimiento de boletín, envía siempre `"subscribed": false`.
+- Con Plunk Lite, una dirección de su lista de supresión (rebote permanente o queja) no se vuelve a suscribir aunque el evento diga `"subscribed": true`: el contacto sigue dado de baja y no recibe nada, tampoco por `/v1/send`. Volver a suscribirla de forma explícita (por ejemplo, marcar el contacto como suscrito) da 409 `ADDRESS_SUPPRESSED`; no hay que reintentarlo.
 - `data` guarda datos del contacto para usarlos en los emails.
 - En el workflow, disparador **Event** con el **mismo nombre exacto** (distingue mayúsculas y espacios). Los workflows también pueden arrancar a mano (API) o por calendario.
 - Eventos reservados que genera Plunk (sirven de disparador pero no se pueden enviar con `/v1/track`): `email.sent`, `email.delivery`, `email.open`, `email.click`, `email.bounce`, `email.complaint`, `contact.subscribed`, `contact.unsubscribed`, `segment.<nombre>.entry`, `segment.<nombre>.exit`. Evita automatizar sobre `email.open` por las aperturas falsas.

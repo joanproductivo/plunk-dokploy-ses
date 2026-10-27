@@ -34,7 +34,7 @@ Y añade funciones que la oficial no tiene:
 - **Segmentos estáticos.** Lanzan eventos de entrada y salida que pueden arrancar workflows, y se gestionan en bloque desde Contactos, desde la ficha de cada contacto y desde los workflows (paso «Update contact» y condición de pertenencia). Se pueden borrar varios a la vez, salvo los que usa otro segmento o una campaña activa.
 - **Avisos.** Un banner en el panel y emails a las direcciones de Settings → Alerts cuando un email no se puede enviar, cuando falla una campaña o un workflow, cuando el proyecto se desactiva, cuando la tasa de rebotes o quejas se acerca a los límites de AWS y cuando SES deja de verificar un dominio.
 
-Estas funciones guardan sus datos en cuatro tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 6).
+Estas funciones guardan sus datos en cinco tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 6).
 
 También es más segura al enviar en volumen. Revisada en octubre de 2026 antes de campañas de miles de emails:
 
@@ -47,9 +47,11 @@ También es más segura al enviar en volumen. Revisada en octubre de 2026 antes 
 - **Apagado.** El api y el worker tienen hasta 30 s para terminar lo que tienen en curso.
 - **Envío a SES sin reintentos ocultos.** El SDK de AWS reintentaba por su cuenta un corte de conexión y podía duplicar un email que SES ya había aceptado. Ahora hay un solo intento, con tiempos límite, y solo se reintenta lo que SES rechazó o lo que nunca llegó a conectar.
 - **Rebotes de alias y reenvíos.** Dan de baja al contacto aunque SES nombre la dirección final.
+- **Lista de supresión propia.** Guarda las direcciones con un rebote permanente o una queja, y las que una importación marca como `bounced`, `cleaned` o `complained` (como el CSV de Flodesk). Nunca se les envía nada, tampoco transaccionales, y nada las vuelve a suscribir: un evento, un envío o una importación las deja dadas de baja, y una petición explícita (dar de alta el contacto desde el panel o marcarlo como suscrito) responde 409 `ADDRESS_SUPPRESSED`. Solo la ficha del contacto en el panel, o la propia persona desde un email que recibió, levantan la supresión.
+- **Reenviar una campaña cancelada.** Tras cancelar, ningún lote del envío anterior crea más emails, y la campaña solo vuelve a borrador cuando ya no le queda ninguno. Si SES pudo aceptar alguno de los que fallaron, se queda cancelada para no enviar dos veces. Reprogramar una campaña cambia de verdad su hora.
 - **Eventos en cola.** Entregas, aperturas y clics los procesa el worker, 5 a la vez, en lugar del webhook. Una campaña grande ya no satura la base de datos, y las copias repetidas de SNS se descartan.
 - **Adjuntos guardados.** La limpieza diaria vacía, pasados 90 días, los adjuntos de los emails junto con su cuerpo. Antes se quedaban para siempre en la base de datos.
-- **Abuso.** Las peticiones tienen un tamaño máximo de 2 MB (10 MB en `/v1/send`, y solo 8 grandes a la vez), el login admite 10 intentos cada 15 minutos por email, y cada proceso tiene un techo de memoria.
+- **Abuso.** Las peticiones tienen un tamaño máximo de 2 MB (10 MB en `/v1/send`, y solo 8 grandes a la vez), el login admite 10 intentos cada 15 minutos por email (sin que un `_` en la dirección valga de comodín), y cada proceso tiene un techo de memoria.
 
 ## 3. Cuándo recomendarla y cuándo no
 
@@ -103,6 +105,7 @@ Antes, avisa de lo que se pierde si se han usado las funciones propias (sección
 - **Emails hechos con el editor de Plunk Lite.** La oficial ignora la marca, el preheader y los pies propios. El botón, el divisor, el espaciador, los vídeos y las cajas con fondo pueden verse peor, sobre todo en Outlook, y el editor oficial abre como HTML los emails con cajas. Revisa las plantillas y las campañas que se vayan a reutilizar.
 - **Workflows con segmentos estáticos.** En la oficial, los segmentos estáticos dejan de lanzar sus eventos de entrada y salida, así que los workflows que arrancan con ellos se quedan parados. Además, un paso «Update contact» que solo cambia segmentos hace fallar la ejecución, y una condición de pertenencia a segmento va siempre por «no».
 - **Avisos.** Dejan de llegar.
+- **Lista de supresión propia.** La oficial no la conoce: una importación o una llamada a `/v1/track` puede volver a suscribir a quien rebotó o se quejó. La supresión de la cuenta de SES sigue bloqueando esos envíos, pero cuentan como intentos. Antes de importar contactos, quita esas direcciones del CSV.
 
 Los datos no se borran: quedan en las tablas `plunk_lite_*` y vuelven a usarse si se regresa a Plunk Lite.
 
