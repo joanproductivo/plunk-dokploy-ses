@@ -55,6 +55,8 @@ policy = {
             "ses:VerifyDomainDkim", "ses:GetIdentityDkimAttributes",
             "ses:GetIdentityVerificationAttributes", "ses:SetIdentityMailFromDomain",
             "ses:SetIdentityFeedbackForwardingEnabled", "ses:DeleteIdentity",
+            # Plunk comprueba al arrancar que los configuration sets tienen su destino de eventos
+            "ses:DescribeConfigurationSet",
         ],
         "Resource": "*",
         "Condition": {
@@ -106,7 +108,12 @@ for cs, events in CONFIG_SETS.items():
         log.append(f"destino de eventos en {cs}: {events}")
     except Exception as e:
         if not already(e): raise
-        log.append(f"destino de eventos en {cs} ya existía")
+        # Ya existía: se pone al día con los tipos de evento de hoy (p. ej. REJECT), sin tocar el topic
+        await call_boto3(service_name="sesv2", operation_name="UpdateConfigurationSetEventDestination", region_name=R,
+            params={"ConfigurationSetName": cs, "EventDestinationName": "plunk-sns",
+                    "EventDestination": {"Enabled": True, "MatchingEventTypes": events,
+                                         "SnsDestination": {"TopicArn": topic_arn}}})
+        log.append(f"destino de eventos en {cs} actualizado: {events}")
 
 # 4. HTTPS subscription to Plunk (Plunk confirms it automatically)
 subs = await call_boto3(service_name="sns", operation_name="ListSubscriptionsByTopic", region_name=R, params={"TopicArn": topic_arn})

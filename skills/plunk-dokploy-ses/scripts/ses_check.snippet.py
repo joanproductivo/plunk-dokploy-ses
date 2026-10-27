@@ -108,11 +108,23 @@ if not isinstance(policy, Exception):
         cond = doc["Statement"][0].get("Condition", {})
         iam["allowed_ip"] = cond.get("IpAddress", {}).get("aws:SourceIp")
         iam["allowed_region"] = cond.get("StringEquals", {}).get("aws:RequestedRegion")
+        expected = {"ses:SendRawEmail", "ses:GetSendQuota", "ses:VerifyDomainDkim", "ses:GetIdentityDkimAttributes",
+                    "ses:GetIdentityVerificationAttributes", "ses:SetIdentityMailFromDomain",
+                    "ses:SetIdentityFeedbackForwardingEnabled", "ses:DeleteIdentity", "ses:DescribeConfigurationSet"}
+        actions = doc["Statement"][0].get("Action", [])
+        iam["missing_actions"] = sorted(expected - set([actions] if isinstance(actions, str) else actions))
     except Exception as e:
         iam["policy"] = {"present": True, "unparsed": str(e)[:100]}
 else:
     iam["policy"] = err(policy)
 
+try:
+    found = await call_boto3(service_name="cloudwatch", operation_name="DescribeAlarms", region_name=R,
+        params={"AlarmNames": ["ses-rebotes-alto", "ses-quejas-alto", "ses-eventos-dlq"]})
+    alarms = {a["AlarmName"]: a["StateValue"] for a in found.get("MetricAlarms", [])}
+except Exception as e:
+    alarms = err(e)
+
 result = {"account": acct, "region": R, "ses": summary, "identities": identities,
-          "config_sets": config_sets, "sns_subscriptions": subscriptions, "iam": iam}
+          "config_sets": config_sets, "sns_subscriptions": subscriptions, "iam": iam, "alarms": alarms}
 result

@@ -146,7 +146,7 @@ Propón estos ajustes y explica cada uno en una frase. Los cambios de env los ha
 - **Platform emails.** `PLUNK_API_KEY` + `PLUNK_FROM_ADDRESS`; sin ellos, "He olvidado mi contraseña" no envía nada.
 - **Límite de peticiones** (`RATE_LIMIT_ENABLED`): viene activado en el compose. Solo hay que tocarlo si una integración propia pasa de 100 eventos o 20 envíos por segundo.
 - **Copia diaria de Postgres** a un destino S3/R2 desde Dokploy (operations.md §5).
-- **`AUTO_PROJECT_DISABLE=true`** (ya viene así en el env generado). Con Plunk Lite frena primero la campaña o el workflow que rebota, y solo desactiva el proyecto como último recurso (`PLUNK_LITE_DISABLE_*_PERCENT`, ver `references/aws-ses.md`); con la oficial, el crítico desactiva el proyecto. Si la persona lo quiere apagar, que sepa que entonces solo recibe avisos. Recomienda también las alarmas de CloudWatch de `references/aws-ses.md`.
+- **`AUTO_PROJECT_DISABLE=true`** (ya viene así en el env generado). Con Plunk Lite frena primero la campaña o el workflow que rebota, y solo desactiva el proyecto como último recurso (`PLUNK_LITE_DISABLE_*_PERCENT`, ver `references/aws-ses.md`); con la oficial, el crítico desactiva el proyecto. Si la persona lo quiere apagar, que sepa que entonces solo recibe avisos. Recomienda también las alarmas de CloudWatch: `scripts/ses_alarms.snippet.py` (references/aws-ses.md). Los valores de entorno, siempre con punto decimal (`0.4`).
 - **No desplegar durante una campaña.** El compose da 45 s para terminar lo que está en curso, pero un despliegue en mitad de un envío grande sigue siendo un riesgo innecesario.
 - **Aperturas.** Avisa de que Gmail, Apple y los antivirus generan aperturas falsas: los clics son la métrica fiable (using-plunk.md §4).
 

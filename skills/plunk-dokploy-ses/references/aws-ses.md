@@ -29,7 +29,7 @@
 | Cola SQS | `plunk-ses-events-dlq` (14 días) | Lo que SNS no consiga entregar queda guardado en vez de perderse (§10) |
 | Supresión de la cuenta | BOUNCE y COMPLAINT | SES no vuelve a intentar direcciones que rebotaron o se quejaron (§10) |
 
-Las 8 acciones: `ses:SendRawEmail`, `ses:GetSendQuota`, `ses:VerifyDomainDkim`, `ses:GetIdentityDkimAttributes`, `ses:GetIdentityVerificationAttributes`, `ses:SetIdentityMailFromDomain`, `ses:SetIdentityFeedbackForwardingEnabled`, `ses:DeleteIdentity`. Plunk crea y borra las identidades de dominio él mismo cuando se añaden o quitan en su panel; por eso necesita las de identidad, además de enviar.
+Las 9 acciones: `ses:SendRawEmail`, `ses:GetSendQuota`, `ses:VerifyDomainDkim`, `ses:GetIdentityDkimAttributes`, `ses:GetIdentityVerificationAttributes`, `ses:SetIdentityMailFromDomain`, `ses:SetIdentityFeedbackForwardingEnabled`, `ses:DeleteIdentity` y `ses:DescribeConfigurationSet`. Plunk crea y borra las identidades de dominio él mismo cuando se añaden o quitan en su panel; por eso necesita las de identidad, además de enviar. La última la usa al arrancar para comprobar que los configuration sets tienen su destino de eventos; sin ella, el log dice «Skipped configuration set check». En una instalación que ya existía, ejecuta `ses_setup` otra vez (actualiza la política y los tipos de evento) y reinicia Plunk, que solo hace esa comprobación al arrancar. `ses_check` lo muestra en `iam.missing_actions`.
 
 **Por qué la condición de IP:** si las claves se filtran, no sirven desde ningún otro sitio. La contrapartida: si el servidor cambia de IP pública, los envíos fallan con AccessDenied hasta actualizar la política (vuelve a ejecutar el snippet con la IP nueva).
 
@@ -74,6 +74,8 @@ Una access key es un secreto: no debe pasar por el chat ni por las herramientas.
 | `sns_subscriptions[].retries` | `40` | `3` es el valor por defecto: ejecuta `ses_setup` otra vez con la suscripción ya confirmada (§10) |
 | `sns_subscriptions[].dlq` | la ARN de `plunk-ses-events-dlq` | Igual que la fila anterior |
 | `ses.suppressed_reasons` | `["BOUNCE", "COMPLAINT"]` | Ejecuta `ses_setup` otra vez (§10) |
+| `iam.missing_actions` | `[]` | Ejecuta `ses_setup` otra vez y reinicia Plunk |
+| `alarms` | las tres en `OK` | Ejecuta `ses_alarms` (antes de enviar en volumen) |
 | `config_sets` | los dos, con `plunk-sns` habilitado | Ejecuta `ses_setup` otra vez |
 | `iam.access_keys` | una, `Active` | Ninguna: falta el paso 3. Dos: que la persona borre la que no usa |
 | `iam.allowed_ip` | IP actual del servidor | Ejecuta `ses_setup` con la IP nueva |
@@ -191,6 +193,8 @@ La suscripción tiene que estar confirmada para poner los reintentos y la DLQ: s
 
 **Antes de enviar en volumen** (miles de emails), comprueba también:
 - **`EMAIL_RATE_LIMIT_PER_SECOND` un poco por debajo de la cuota.** Por ejemplo, `12` con 14/s, para no rozar el límite de SES.
-- **`AUTO_PROJECT_DISABLE=true`.** Con Plunk Lite, una campaña que rebota (≥100 enviados, ≥5 % de rebotes o ≥0,1 % de quejas) se cancela sola y un workflow igual se desactiva; el proyecto entero solo se desactiva como último recurso, con `PLUNK_LITE_DISABLE_BOUNCE_PERCENT` (8) y `PLUNK_LITE_DISABLE_COMPLAINT_PERCENT` (0,4) en 7 días, antes de que AWS pause la cuenta (10 % y 0,5 %). Se reactiva desde el panel. Con la imagen oficial, el crítico desactiva el proyecto directamente.
-- **Alarmas de CloudWatch (recomendado).** Un topic SNS `plunk-alarmas` con una suscripción de email y tres alarmas: `AWS/SES Reputation.BounceRate` ≥ 0,04 y `Reputation.ComplaintRate` ≥ 0,0008 (sin dimensiones, `Maximum`, 1 h, `TreatMissingData=ignore`: SES publica esas métricas a intervalos irregulares) y `AWS/SQS ApproximateNumberOfMessagesVisible` de `plunk-ses-events-dlq` ≥ 1 (5 min, `notBreaching`). Caben en la capa gratuita. Con Plunk Lite, suscribe además el topic por HTTPS a `<API>/webhooks/sns` (con los mismos reintentos que los eventos y **sin** DLQ) y las alarmas salen también en el banner del panel.
+- **`AUTO_PROJECT_DISABLE=true`.** Con Plunk Lite, una campaña que rebota (≥100 enviados, ≥5 % de rebotes o ≥0,1 % de quejas) se cancela sola y un workflow igual se desactiva; el proyecto entero solo se desactiva como último recurso, con `PLUNK_LITE_DISABLE_BOUNCE_PERCENT` (`8`) y `PLUNK_LITE_DISABLE_COMPLAINT_PERCENT` (`0.4`, con punto) en 7 días, antes de que AWS pause la cuenta (10 % y 0,5 %). Se reactiva desde el panel. Con la imagen oficial, el crítico desactiva el proyecto directamente.
+- **Valores de entorno con punto decimal** (`0.4`, no `0,4`). Plunk Lite acepta la coma desde `sha-5a1ebe2`, pero una imagen anterior no arrancaba con ella.
+- **Si la cuenta de AWS está en el plan gratuito** (FREE), caduca a los 6 meses o al agotar el crédito, y con ella SES. Pásala a un plan de pago antes (AWS Settings → Billing), con un límite de gasto si se quiere.
+- **Alarmas de CloudWatch (recomendado), con `scripts/ses_alarms.snippet.py`** (`ALARM_EMAIL`, `API_DOMAIN`, `PANEL=si` con Plunk Lite). Un topic SNS `plunk-alarmas` con una suscripción de email y tres alarmas: `AWS/SES Reputation.BounceRate` ≥ 0,04 y `Reputation.ComplaintRate` ≥ 0,0008 (sin dimensiones, `Maximum`, 1 h, `TreatMissingData=ignore`: SES publica esas métricas a intervalos irregulares) y `AWS/SQS ApproximateNumberOfMessagesVisible` de `plunk-ses-events-dlq` ≥ 1 (5 min, `notBreaching`). Caben en la capa gratuita. Con Plunk Lite, suscribe además el topic por HTTPS a `<API>/webhooks/sns` (con los mismos reintentos que los eventos y **sin** DLQ) y las alarmas salen también en el banner del panel.
 - **Que la cuenta ya salió del sandbox.** En el sandbox el límite es de 200 emails al día.
