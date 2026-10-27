@@ -22,8 +22,8 @@ DELIVERY_POLICY = {
     }
 }
 CONFIG_SETS = {
-    "plunk-configuration-set": ["DELIVERY", "OPEN", "CLICK", "BOUNCE", "COMPLAINT"],
-    "plunk-no-tracking-configuration-set": ["DELIVERY", "BOUNCE", "COMPLAINT"],
+    "plunk-configuration-set": ["DELIVERY", "OPEN", "CLICK", "BOUNCE", "COMPLAINT", "REJECT"],
+    "plunk-no-tracking-configuration-set": ["DELIVERY", "BOUNCE", "COMPLAINT", "REJECT"],
 }
 log = []
 

@@ -175,7 +175,7 @@ Plunk usa la cuota que lee de SES. Antes de enviar en volumen, conviene fijar `E
 
 Gmail (proxy de imágenes), Apple Mail Privacy Protection y algunos antivirus descargan el píxel al recibir el email, y Plunk 0.17 cuenta eso como apertura (en las pruebas llegó 1–2 s después de la entrega). Está reportado en https://github.com/useplunk/plunk/issues/531. Si la persona prefiere no ver aperturas falsas, quita `OPEN` del configuration set principal y se queda con los clics, que sí son fiables:
 
-`sesv2:UpdateConfigurationSetEventDestination` en `plunk-configuration-set` / `plunk-sns` con `MatchingEventTypes: ["DELIVERY","CLICK","BOUNCE","COMPLAINT"]` (mantén `Enabled: true` y el mismo `SnsDestination`). Es reversible volviendo a añadir `OPEN`. Pide confirmación antes: cambia lo que mide la herramienta.
+`sesv2:UpdateConfigurationSetEventDestination` en `plunk-configuration-set` / `plunk-sns` con `MatchingEventTypes: ["DELIVERY","CLICK","BOUNCE","COMPLAINT","REJECT"]` (mantén `Enabled: true` y el mismo `SnsDestination`). Es reversible volviendo a añadir `OPEN`. Pide confirmación antes: cambia lo que mide la herramienta.
 
 ## 10. Que no se pierdan rebotes ni quejas
 
@@ -191,5 +191,6 @@ La suscripción tiene que estar confirmada para poner los reintentos y la DLQ: s
 
 **Antes de enviar en volumen** (miles de emails), comprueba también:
 - **`EMAIL_RATE_LIMIT_PER_SECOND` un poco por debajo de la cuota.** Por ejemplo, `12` con 14/s, para no rozar el límite de SES.
-- **`AUTO_PROJECT_DISABLE=true`.** Así un proyecto con la tasa de rebotes o quejas en crítico deja de enviar antes de que AWS revise la cuenta entera.
+- **`AUTO_PROJECT_DISABLE=true`.** Con Plunk Lite, una campaña que rebota (≥100 enviados, ≥5 % de rebotes o ≥0,1 % de quejas) se cancela sola y un workflow igual se desactiva; el proyecto entero solo se desactiva como último recurso, con `PLUNK_LITE_DISABLE_BOUNCE_PERCENT` (8) y `PLUNK_LITE_DISABLE_COMPLAINT_PERCENT` (0,4) en 7 días, antes de que AWS pause la cuenta (10 % y 0,5 %). Se reactiva desde el panel. Con la imagen oficial, el crítico desactiva el proyecto directamente.
+- **Alarmas de CloudWatch (recomendado).** Un topic SNS `plunk-alarmas` con una suscripción de email y tres alarmas: `AWS/SES Reputation.BounceRate` ≥ 0,04 y `Reputation.ComplaintRate` ≥ 0,0008 (sin dimensiones, `Maximum`, 1 h, `TreatMissingData=ignore`: SES publica esas métricas a intervalos irregulares) y `AWS/SQS ApproximateNumberOfMessagesVisible` de `plunk-ses-events-dlq` ≥ 1 (5 min, `notBreaching`). Caben en la capa gratuita. Con Plunk Lite, suscribe además el topic por HTTPS a `<API>/webhooks/sns` (con los mismos reintentos que los eventos y **sin** DLQ) y las alarmas salen también en el banner del panel.
 - **Que la cuenta ya salió del sandbox.** En el sandbox el límite es de 200 emails al día.

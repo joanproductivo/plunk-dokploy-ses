@@ -139,6 +139,10 @@ services:
       PLUNK_FROM_ADDRESS: ${PLUNK_FROM_ADDRESS:-}
 
       AUTO_PROJECT_DISABLE: ${AUTO_PROJECT_DISABLE:-true}
+      # Plunk Lite: antes frena la campaña o el workflow que rebota; el proyecto solo se desactiva como último
+      # recurso (rebotes en 7 días con ≥25 en ≥200 emails, o quejas con ≥5). Admiten coma decimal
+      PLUNK_LITE_DISABLE_BOUNCE_PERCENT: ${PLUNK_LITE_DISABLE_BOUNCE_PERCENT:-8}
+      PLUNK_LITE_DISABLE_COMPLAINT_PERCENT: ${PLUNK_LITE_DISABLE_COMPLAINT_PERCENT:-0.4}
       # Cerrado si el env no dice otra cosa: con las altas abiertas, cualquiera podría enviar con tu cuenta de SES
       DISABLE_SIGNUPS: ${DISABLE_SIGNUPS:-true}
       SHOW_SPONSOR: ${SHOW_SPONSOR:-false}
