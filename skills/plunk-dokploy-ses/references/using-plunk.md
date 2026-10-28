@@ -89,6 +89,7 @@ Authorization: Bearer pk_…
 - **Segmentos (Plunk Lite, solo con la `sk_`).** `"segments": ["<id>", …]` mete al contacto en esos segmentos estáticos (hasta 20) en la misma llamada. Entra antes del evento, así que los workflows que arranca el evento ya lo ven dentro, y los eventos de entrada se lanzan después del evento. Con la `pk_` da 403, y un id que no es un segmento estático del proyecto da 422 sin guardar nada. Los ids se ven con `GET /segments` (con la `sk_`) o con `plunk_list_segments` en el MCP.
 - En el workflow, disparador **Event** con el **mismo nombre exacto** (distingue mayúsculas y espacios). Los workflows también pueden arrancar a mano (API) o por calendario.
 - Eventos reservados que genera Plunk (sirven de disparador pero no se pueden enviar con `/v1/track`): `email.sent`, `email.delivery`, `email.open`, `email.click`, `email.bounce`, `email.complaint`, `contact.subscribed`, `contact.unsubscribed`, `segment.<nombre>.entry`, `segment.<nombre>.exit`. Evita automatizar sobre `email.open` por las aperturas falsas.
+- `contact.unsubscribed` lleva en sus datos un `reason` cuando no fue una baja normal: `snooze` (pausa temporal, vuelve sola), y con Plunk Lite `bounce` o `complaint` (la baja que causa un rebote permanente o una queja). Quien sincroniza bajas con su web puede leerlo en `event.reason` del cuerpo del webhook para tratar cada caso.
 
 ## 4. Seguimiento de aperturas y clics
 

@@ -35,8 +35,10 @@ Y añade funciones que la oficial no tiene:
 - **MCP.** Su MCP lleva herramientas para los segmentos estáticos y avisa de los dados de baja en las campañas TRANSACTIONAL. Para usarlo desde claude.ai, el compose de mcp-remote.md lo compila en el mismo commit que la imagen (§2 de ese fichero).
 - **Segmentos estáticos.** Lanzan eventos de entrada y salida que pueden arrancar workflows, y se gestionan en bloque desde Contactos, desde la ficha de cada contacto y desde los workflows (paso «Update contact» y condición de pertenencia). Se pueden borrar varios a la vez, salvo los que usa otro segmento o una campaña activa.
 - **Avisos.** Un banner en el panel y emails a las direcciones de Settings → Alerts cuando un email no se puede enviar, cuando falla una campaña o un workflow, cuando el proyecto se desactiva, cuando la tasa de rebotes o quejas se acerca a los límites de AWS y cuando SES deja de verificar un dominio.
+- **Bajas por rebote o queja.** Un rebote permanente o una queja que da de baja a un contacto suscrito (o en pausa) lanza `contact.unsubscribed` con `reason` `bounce` o `complaint`, justo después de `email.bounce` o `email.complaint`. Así un solo workflow con disparador `contact.unsubscribed` y un paso Webhook mantiene al día las bajas en otra web. En las estadísticas cuenta como baja además de como rebote o queja, y una sola vez en las sumas (contactos perdidos de la campaña y Net de Audiencia).
+- **Webhooks firmados.** El paso Webhook de un workflow puede llevar un secreto propio: cada petición lleva entonces `X-Plunk-Signature` (HMAC-SHA256 del cuerpo con marca de tiempo), para que quien la recibe compruebe que viene de Plunk. Una respuesta que no sea 2xx hace fallar el paso y avisa.
 
-Estas funciones guardan sus datos en seis tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 6).
+Estas funciones guardan sus datos en siete tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 6).
 
 También es más segura al enviar en volumen. Revisada en octubre de 2026 antes de campañas de miles de emails:
 
