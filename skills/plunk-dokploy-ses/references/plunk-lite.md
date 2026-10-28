@@ -128,7 +128,7 @@ El resto no cambia: el env (con las variables `S3_*` del bucket), los dominios, 
 
 1. Ejecuta `python3 scripts/plunk_lite_latest.py` (sección 4). Si la etiqueta coincide con la del compose, ya está al día. Si no, lee en el repositorio qué cambió entre los dos commits: `https://github.com/joanproductivo/plunk-lite/compare/<commit instalado>...<commit nuevo>`.
 2. Haz una copia de Postgres (operations.md §5).
-3. Si la política de IAM no tiene aún `ses:GetAccount` (`ses_check` lo muestra en `iam.missing_actions`), ejecuta `ses_setup` otra vez antes de desplegar.
+3. Si la política de IAM no tiene aún `ses:GetAccount` (`ses_check` lo muestra en `iam.missing_actions`) o el statement `PlunkDLQ` con que Plunk Lite vacía la DLQ (`iam.missing_dlq_actions`), ejecuta `ses_setup` otra vez antes de desplegar. Sin `PlunkDLQ`, todos los paneles avisan «AWS dead-letter queue not readable» y la DLQ no se vacía.
 4. Cambia la etiqueta de la imagen en el compose y despliega. Si usas el MCP remoto, regenera su compose con el commit nuevo y despliégalo también (mcp-remote.md §8). Si cambian también los `command` de Postgres o Redis (como en la versión con el lote E4), Docker los recrea y la instalación se corta alrededor de un minuto: despliega fuera de una campaña.
 5. Verifica como en la sección 4. Si algo falla, vuelve a la etiqueta anterior con el mismo compose.
 

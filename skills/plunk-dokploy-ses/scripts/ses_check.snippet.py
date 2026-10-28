@@ -120,6 +120,12 @@ if not isinstance(policy, Exception):
         iam["missing_dlq_actions"] = sorted(
             {"sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:ChangeMessageVisibility", "sqs:GetQueueAttributes"}
             - set([dlq_actions] if isinstance(dlq_actions, str) else dlq_actions))
+        # Y que sea sobre esta cola, en esta región y cuenta, con las mismas condiciones que el de SES
+        dlq_cond = (dlq or {}).get("Condition", {})
+        iam["dlq_statement_ok"] = bool(dlq) and (
+            (dlq or {}).get("Resource") == f"arn:aws:sqs:{R}:{acct}:plunk-ses-events-dlq"
+            and dlq_cond.get("IpAddress", {}).get("aws:SourceIp") == iam["allowed_ip"]
+            and dlq_cond.get("StringEquals", {}).get("aws:RequestedRegion") == iam["allowed_region"])
     except Exception as e:
         iam["policy"] = {"present": True, "unparsed": str(e)[:100]}
 else:

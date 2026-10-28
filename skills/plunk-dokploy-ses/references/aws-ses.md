@@ -31,7 +31,7 @@
 
 Las 10 acciones: `ses:SendRawEmail`, `ses:GetSendQuota`, `ses:VerifyDomainDkim`, `ses:GetIdentityDkimAttributes`, `ses:GetIdentityVerificationAttributes`, `ses:SetIdentityMailFromDomain`, `ses:SetIdentityFeedbackForwardingEnabled`, `ses:DeleteIdentity`, `ses:DescribeConfigurationSet` y `ses:GetAccount`. Plunk crea y borra las identidades de dominio él mismo cuando se añaden o quitan en su panel; por eso necesita las de identidad, además de enviar. `ses:DescribeConfigurationSet` la usa al arrancar para comprobar que los configuration sets tienen su destino de eventos; sin ella, el log dice «Skipped configuration set check». `ses:GetAccount` (de la API v2 de SES) la usa Plunk Lite para leer el estado de la cuenta cuando un envío se rechaza: si SES la ha pausado, pausa la cola al primer rechazo. Sin ella, el log dice «Could not read the account's status» y la pausa se deduce solo de los rechazos. `GetAccountSendingEnabled` no sirve para esto: no cambia cuando SES pausa la cuenta. En una instalación que ya existía, ejecuta `ses_setup` otra vez (actualiza la política y los tipos de evento) y reinicia Plunk, que solo hace la comprobación de los configuration sets al arrancar. `ses_check` muestra lo que falta en `iam.missing_actions`.
 
-Además, un segundo statement, `PlunkDLQ`, con las mismas condiciones y solo sobre la cola `plunk-ses-events-dlq`: `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` y `sqs:GetQueueAttributes`. Plunk Lite lo usa para vaciar la DLQ él solo (§10). Va aparte porque el de SES lleva `Resource: "*"`: con las acciones de SQS ahí, valdrían para todas las colas de la cuenta. Sin él, el panel avisa «AWS dead-letter queue not readable».
+Además, un segundo statement, `PlunkDLQ`, con las mismas condiciones y solo sobre la cola `plunk-ses-events-dlq`: `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` y `sqs:GetQueueAttributes`. Plunk Lite lo usa para vaciar la DLQ él solo (§10). Va aparte porque el de SES lleva `Resource: "*"`: con las acciones de SQS ahí, valdrían para todas las colas de la cuenta. Sin él, el panel avisa «AWS dead-letter queue not readable». `ses_setup` escribe la política entera (`PutUserPolicy`): lo que alguien haya añadido a mano a `plunk-ses-sending` desaparece al volver a ejecutarlo, así que cualquier permiso más va en el snippet.
 
 **Por qué la condición de IP:** si las claves se filtran, no sirven desde ningún otro sitio. La contrapartida: si el servidor cambia de IP pública, los envíos fallan con AccessDenied hasta actualizar la política (vuelve a ejecutar el snippet con la IP nueva).
 
@@ -77,6 +77,8 @@ Una access key es un secreto: no debe pasar por el chat ni por las herramientas.
 | `sns_subscriptions[].dlq` | la ARN de `plunk-ses-events-dlq` | Igual que la fila anterior |
 | `ses.suppressed_reasons` | `["BOUNCE", "COMPLAINT"]` | Ejecuta `ses_setup` otra vez (§10) |
 | `iam.missing_actions` | `[]` | Ejecuta `ses_setup` otra vez y reinicia Plunk |
+| `iam.missing_dlq_actions` | `[]` | Con Plunk Lite: ejecuta `ses_setup` otra vez, antes de desplegar una imagen que vacía la DLQ |
+| `iam.dlq_statement_ok` | `true` | El statement `PlunkDLQ` apunta a otra cola o región, o no lleva las condiciones de IP y región: ejecuta `ses_setup` otra vez |
 | `alarms` | las tres en `OK` | Ejecuta `ses_alarms` (antes de enviar en volumen) |
 | `config_sets` | los dos, con `plunk-sns` habilitado | Ejecuta `ses_setup` otra vez |
 | `iam.access_keys` | una, `Active` | Ninguna: falta el paso 3. Dos: que la persona borre la que no usa |
