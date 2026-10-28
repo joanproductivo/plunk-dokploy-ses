@@ -161,7 +161,8 @@ services:
       # Plunk Lite: un contacto nuevo por la API cuyo dominio no existe, no recibe correo, es desechable o es una
       # errata de un gran proveedor (gmial.com) recibe 422 con la dirección sugerida; false lo apaga
       PLUNK_LITE_VERIFY_SIGNUPS: ${PLUNK_LITE_VERIFY_SIGNUPS:-true}
-      # Plunk Lite: off apaga /v1/track (la única ruta de la clave pk_) con 403, si nada lo usa desde un navegador
+      # Plunk Lite: off apaga la clave pk_ con 403, si nada llama a /v1/track desde un navegador;
+      # /v1/track sigue funcionando con la sk_ desde un servidor
       PLUNK_LITE_PUBLIC_TRACK: ${PLUNK_LITE_PUBLIC_TRACK:-on}
     volumes:
       - plunk_data:/app/data

@@ -47,6 +47,11 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | Enlaces de acceso que "ya se usaron" | El seguimiento de clics y los antivirus los abren antes | Tracking en "Marketing only" |
 | El dashboard marca un porcentaje de aperturas o clics más bajo que las campañas | Con tracking "Marketing only" o "Disabled", Plunk 0.17 cuenta en el total los emails sin seguimiento (useplunk/plunk#533) | Mira la página de la campaña o Analytics filtrado por stream (using-plunk.md §4) |
 | Altas de eventos suscriben a gente sin consentimiento | `/v1/track` sin `"subscribed": false` | Añádelo |
+| 403 «Public keys are switched off» en `/v1/track` (Plunk Lite) | `PLUNK_LITE_PUBLIC_TRACK=off` y la llamada usa la `pk_` | Llámalo desde el servidor con la `sk_`, o vuelve a poner `on` |
+| 403 al usar `segments` en `/v1/track` (Plunk Lite) | Los segmentos solo se admiten con la `sk_` | Llama desde el servidor con la `sk_` |
+| 422 «Some segments cannot take contacts» (Plunk Lite) | Un id de `segments` no existe, es de otro proyecto o es un segmento con filtros | Usa ids de segmentos estáticos del proyecto |
+| 400 «Not enough SES quota» al enviar una campaña (Plunk Lite) | No cabe en el 95 % de la cuota de SES de 24 horas, contando lo enviado y lo que les falta a las campañas en curso | Envíala o prográmala cuando haya cuota, o pide más a AWS |
+| Aviso «Amazon SES» en el banner y los emails parados (Plunk Lite) | SES dio la cuota diaria por agotada o pausó la cuenta: la cola espera (15 min) o se pausa y prueba cada 30 min | Mira la cuenta en SES (aws-ses.md). El aviso se cierra solo con el primer email que sale |
 | El workflow no se dispara | El nombre del evento no coincide exactamente | Mismo texto, mayúsculas y espacios incluidos |
 | No aparece el selector "Email tracking" | Falta `SES_CONFIGURATION_SET_NO_TRACKING` | Defínela y despliega |
 | "He olvidado mi contraseña" no envía nada | Platform emails desactivados | `PLUNK_API_KEY` + `PLUNK_FROM_ADDRESS` (using-plunk.md §5) |

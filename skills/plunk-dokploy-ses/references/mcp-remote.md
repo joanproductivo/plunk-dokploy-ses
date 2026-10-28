@@ -1,6 +1,6 @@
 # MCP de Plunk accesible desde claude.ai
 
-Para usar Plunk desde claude.ai (o cualquier cliente MCP remoto) sin tener un ordenador encendido. Probado en octubre de 2026 con @plunk/mcp 0.17.0, claude.ai y Claude Code.
+Para usar Plunk desde claude.ai (o cualquier cliente MCP remoto) sin tener un ordenador encendido. Probado en octubre de 2026 con @plunk/mcp 0.17.0 y con el MCP de Plunk Lite, claude.ai y Claude Code.
 
 ## Índice
 1. Por qué hace falta montarlo
@@ -22,14 +22,28 @@ Un compose aparte en Dokploy (`assets/mcp-remoto/docker-compose.yml`), con dos s
 
 | Servicio | Qué hace | Expuesto |
 |---|---|---|
-| `plunk-mcp` | Imagen construida en el propio despliegue (`dockerfile_inline`): Node 22 + `@plunk/mcp` + un pequeño servidor HTTP (`server.mjs`) que sirve el MCP por Streamable HTTP | No: solo en la red interna del compose |
+| `plunk-mcp` | Imagen construida en el propio despliegue (`dockerfile_inline`): Node 22, el MCP de Plunk y un pequeño servidor HTTP (`server.mjs`) que lo sirve por Streamable HTTP. El MCP es `@plunk/mcp` de npm con la imagen oficial, o el de Plunk Lite compilado desde su repositorio con Plunk Lite | No: solo en la red interna del compose |
 | `plunk-mcp-auth` | [mcp-auth-proxy](https://github.com/sigbit/mcp-auth-proxy): servidor OAuth 2.1 con registro dinámico (DCR) para claude.ai; exige login con GitHub y solo deja pasar a los usuarios permitidos | Sí: dominio `envio-mcp.<dominio>` → puerto 80 |
 
-`server.mjs` atiende los dos protocolos: el nuevo (2026-07-28, el que usa claude.ai) y el de 2025, este último con sesiones con estado para que el servidor pueda pedir confirmación al usuario. Para cambiarlo, edita `server.mjs` y regenera el compose con `python3 gen_compose.py` (dentro de `server.mjs` no puede haber `$`: Compose lo tomaría por una variable).
+`server.mjs` atiende los dos protocolos: el nuevo (2026-07-28, el que usa claude.ai) y el de 2025, este último con sesiones con estado para que el servidor pueda pedir confirmación al usuario. Para cambiarlo, edita `server.mjs` y regenera el compose con `gen_compose.py` (dentro de `server.mjs` no puede haber `$`: Compose lo tomaría por una variable).
+
+**El MCP tiene que ir con la imagen de Plunk.** `assets/mcp-remoto/docker-compose.yml` lleva el de npm, que es el de la imagen oficial. Con Plunk Lite, genera el compose con el MCP de Plunk Lite, en el mismo commit que la imagen desplegada:
+
+```bash
+cd assets/mcp-remoto
+python3 gen_compose.py --plunk-lite <commit>
+```
+
+El commit es el que imprime `scripts/plunk_lite_latest.py` (la línea `Commit:`, entero), o el de la etiqueta `sha-<commit>` del compose de `plunk`. El MCP de npm también funciona con Plunk Lite, pero no conoce sus funciones:
+- las herramientas `plunk_add_to_segment` y `plunk_remove_from_segment` para los segmentos estáticos;
+- en `plunk_send_campaign`, el número de contactos dados de baja que recibe una campaña TRANSACTIONAL;
+- los arreglos del MCP que Plunk aún no ha publicado.
+
+Un MCP de un commit más nuevo que la imagen puede pedir rutas que esa API aún no tiene: usa el mismo commit. La primera construcción tarda unos minutos más, porque compila el MCP.
 
 ## 3. Instalación
 
-1. **Compose:** crea en Dokploy un compose raw `plunk-mcp` (en el mismo proyecto que Plunk), pega `assets/mcp-remoto/docker-compose.yml` y activa isolatedDeployment.
+1. **Compose:** crea en Dokploy un compose raw `plunk-mcp` (en el mismo proyecto que Plunk), pega `assets/mcp-remoto/docker-compose.yml` (con Plunk Lite, el generado con `--plunk-lite`, §2) y activa isolatedDeployment.
 2. **Env:** usa `assets/mcp-remoto/env.template`. Puedes guardarlo por la API mientras solo tenga los `PEGAR_EN_DOKPLOY`; después, lo edita la persona.
 3. **Dominio:** `envio-mcp.<dominio>` → servicio `plunk-mcp-auth`, puerto 80, HTTPS con Let's Encrypt.
 4. **Primer despliegue sin claves.** Sirve para comprobar que el servidor construye la imagen y que el dominio responde. Sin claves nadie puede entrar.
@@ -80,6 +94,8 @@ Si se permiten, recomienda dejar en "pedir permiso" (no "permitir siempre") en l
 
 El aviso de Claude muestra los argumentos, pero no cuántas personas recibirán una campaña. Antes de aprobar un `plunk_send_campaign`, que Claude diga el tamaño de la audiencia (`plunk_get_campaign` lo incluye).
 
+Con el MCP de Plunk Lite, una campaña TRANSACTIONAL también llega a los contactos dados de baja, así que `plunk_send_campaign` dice cuántos son. Si no puede contarlos, no la envía, salvo que se llame otra vez con `includeUnsubscribed: true`, y al modelo se le indica que solo lo haga cuando la persona lo pida.
+
 ## 6. Comprobar y probar
 
 - **Sin login:** `https://envio-mcp.<dominio>/.well-known/oauth-protected-resource` debe dar 200, y `POST /mcp` sin token, 401.
@@ -100,6 +116,7 @@ El aviso de Claude muestra los argumentos, pero no cuántas personas recibirán 
 
 - **Versiones fijadas** en `server.mjs` y el Dockerfile: `@plunk/mcp@0.17.0`, `@modelcontextprotocol/server@2.4.0`, `@modelcontextprotocol/node@2.1.2` y `mcp-auth-proxy:2.10.2`.
   - Al actualizar Plunk, sube `@plunk/mcp` a la misma versión.
+  - Con Plunk Lite, cada vez que cambies la imagen, regenera el compose con `--plunk-lite` y el commit nuevo, pégalo en `plunk-mcp` y despliégalo.
   - Comprueba que `@plunk/mcp` sigue exponiendo `buildServer` (export principal) y `dist/config.js` (`loadConfig`), que usa `server.mjs`.
 - **Varios proyectos en la misma instalación:** `@plunk/mcp` admite `PLUNK_API_KEY_<NOMBRE>` por proyecto, y cada herramienta pide entonces el argumento `project`. Habría que añadir esas variables a la sección `environment` de `plunk-mcp` y quitar `PLUNK_MCP_API_KEY`, que no se puede combinar con claves por nombre.
 - **Una instalación de Plunk = un compose `plunk-mcp`**, con su dominio, su app de GitHub (la callback es única por dominio) y su conector en claude.ai.
