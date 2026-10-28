@@ -36,7 +36,12 @@ Y añade funciones que la oficial no tiene:
 - **Segmentos estáticos.** Lanzan eventos de entrada y salida que pueden arrancar workflows, y se gestionan en bloque desde Contactos, desde la ficha de cada contacto y desde los workflows (paso «Update contact» y condición de pertenencia). Se pueden borrar varios a la vez, salvo los que usa otro segmento o una campaña activa.
 - **Avisos.** Un banner en el panel y emails a las direcciones de Settings → Alerts cuando un email no se puede enviar, cuando falla una campaña o un workflow, cuando el proyecto se desactiva, cuando la tasa de rebotes o quejas se acerca a los límites de AWS y cuando SES deja de verificar un dominio.
 - **Bajas por rebote o queja.** Un rebote permanente o una queja que da de baja a un contacto suscrito (o en pausa) lanza `contact.unsubscribed` con `reason` `bounce` o `complaint`, justo después de `email.bounce` o `email.complaint`. Así un solo workflow con disparador `contact.unsubscribed` y un paso Webhook mantiene al día las bajas en otra web. En las estadísticas cuenta como baja además de como rebote o queja, y una sola vez en las sumas (contactos perdidos de la campaña y Net de Audiencia).
-- **Webhooks firmados.** El paso Webhook de un workflow puede llevar un secreto propio: cada petición lleva entonces `X-Plunk-Signature` (HMAC-SHA256 del cuerpo con marca de tiempo), para que quien la recibe compruebe que viene de Plunk. Una respuesta que no sea 2xx hace fallar el paso y avisa.
+- **Webhooks firmados.** El paso Webhook de un workflow puede llevar un secreto propio, para que quien recibe la petición compruebe que viene de Plunk.
+  - **Poner el secreto:** quien recibe lo genera y lo pone con `PUT /workflows/<id>/steps/<stepId>/signing-secret`, con la `sk_` y `{"secret": "<32 a 256 caracteres ASCII imprimibles, sin espacios>"}`. Conviene crear el workflow apagado, añadir el paso, poner el secreto y encenderlo después, para que no salga ningún aviso sin firmar.
+  - **Lo que lleva cada petición:** `X-Plunk-Signature: t=<segundos unix>,v1=<hex HMAC-SHA256 de "<t>." + el cuerpo tal como se envía>`. Con GET se firma `"<t>."`.
+  - **Comprobarla:** el receptor recalcula la firma sobre los bytes crudos, compara en tiempo constante y rechaza un `t` a más de 5 minutos de su reloj.
+  - **El secreto no se puede leer:** `GET` en la misma ruta solo dice si hay uno, y `DELETE` lo quita. Duplicar el workflow no lo copia: el duplicado sale sin firma.
+  - **Una respuesta que no sea 2xx** hace fallar el paso y avisa. No se reintenta, así que el receptor debe responder 2xx también a lo repetido o ya hecho.
 
 Estas funciones guardan sus datos en siete tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 6).
 
@@ -133,6 +138,8 @@ Antes, avisa de lo que se pierde si se han usado las funciones propias (sección
 - **Emails hechos con el editor de Plunk Lite.** La oficial ignora la marca, el preheader y los pies propios. El botón, el divisor, el espaciador, los vídeos y las cajas con fondo pueden verse peor, sobre todo en Outlook, y el editor oficial abre como HTML los emails con cajas. Revisa las plantillas y las campañas que se vayan a reutilizar.
 - **Workflows con segmentos estáticos.** En la oficial, los segmentos estáticos dejan de lanzar sus eventos de entrada y salida, así que los workflows que arrancan con ellos se quedan parados. Además, un paso «Update contact» que solo cambia segmentos hace fallar la ejecución, y una condición de pertenencia a segmento va siempre por «no».
 - **Avisos.** Dejan de llegar.
+- **Webhooks firmados.** Salen sin firma. El receptor que la exige los rechaza y la oficial da el paso por bueno con cualquier respuesta, así que esos avisos se pierden sin alerta: apaga antes esos workflows. Volver a una Plunk Lite anterior a esta función tiene el mismo efecto.
+- **Bajas por rebote o queja.** Vuelven a dar de baja sin lanzar `contact.unsubscribed`: un workflow de bajas deja de enterarse de ellas.
 - **API.** Un `/v1/send` con varios destinatarios vuelve a cortarse en el primero que falla (sin 207), las altas con un email que no recibe correo vuelven a entrar, y las variables `PLUNK_LITE_*` se ignoran.
   - Un `/v1/track` con la clave secreta da 401: el formulario que la use tiene que pasar a la `pk_`, o a `POST /contacts` y `POST /events/track`.
   - El campo `segments` se ignora sin error: los contactos no entran en esos segmentos.
