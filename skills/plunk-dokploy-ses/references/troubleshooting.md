@@ -30,6 +30,7 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | No se puede cambiar el plan de precios de SES | Hay una petición de producción en revisión | Espera la respuesta de AWS |
 | AWS deniega la producción | Falta contexto de cómo se obtienen los contactos, o la web no muestra formulario | Responder en el mismo caso (aws-ses.md §6), sin reenviar la petición |
 | DKIM `PENDING` o `FAILED` | Registros DNS mal o en otra zona | `check_dns.sh` y dns.md §4 |
+| Plunk Lite avisa «AWS dead-letter queue not readable» | La política de `plunk-ses` no tiene el statement `PlunkDLQ`, o la DLQ es de otra región o cuenta | Ejecuta `ses_setup` otra vez (aws-ses.md §2); el aviso se cierra solo con la siguiente lectura correcta |
 
 ## Uso
 

@@ -114,6 +114,12 @@ if not isinstance(policy, Exception):
                     "ses:GetAccount"}
         actions = doc["Statement"][0].get("Action", [])
         iam["missing_actions"] = sorted(expected - set([actions] if isinstance(actions, str) else actions))
+        # Plunk Lite vacía la DLQ con un segundo statement, solo sobre esa cola
+        dlq = next((st for st in doc["Statement"] if st.get("Sid") == "PlunkDLQ"), None)
+        dlq_actions = (dlq or {}).get("Action", [])
+        iam["missing_dlq_actions"] = sorted(
+            {"sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:ChangeMessageVisibility", "sqs:GetQueueAttributes"}
+            - set([dlq_actions] if isinstance(dlq_actions, str) else dlq_actions))
     except Exception as e:
         iam["policy"] = {"present": True, "unparsed": str(e)[:100]}
 else:

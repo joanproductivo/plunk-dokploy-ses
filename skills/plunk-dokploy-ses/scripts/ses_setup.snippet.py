@@ -65,6 +65,19 @@ policy = {
             "StringEquals": {"aws:RequestedRegion": R},
             "IpAddress": {"aws:SourceIp": SERVER_IP},
         },
+    }, {
+        # Plunk Lite vacía la DLQ (paso 5): lee lo que SNS no pudo entregar y lo procesa. Solo esa cola.
+        "Sid": "PlunkDLQ",
+        "Effect": "Allow",
+        "Action": [
+            "sqs:ReceiveMessage", "sqs:DeleteMessage",
+            "sqs:ChangeMessageVisibility", "sqs:GetQueueAttributes",
+        ],
+        "Resource": f"arn:aws:sqs:{R}:{acct}:{DLQ}",
+        "Condition": {
+            "StringEquals": {"aws:RequestedRegion": R},
+            "IpAddress": {"aws:SourceIp": SERVER_IP},
+        },
     }],
 }
 await call_boto3(service_name="iam", operation_name="PutUserPolicy",

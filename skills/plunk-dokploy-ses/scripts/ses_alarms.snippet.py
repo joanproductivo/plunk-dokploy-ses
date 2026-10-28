@@ -69,7 +69,7 @@ alarms = [
     {"AlarmName": "ses-eventos-dlq", "Namespace": "AWS/SQS", "MetricName": "ApproximateNumberOfMessagesVisible",
      "Dimensions": [{"Name": "QueueName", "Value": DLQ}], "Period": 300, "Threshold": 1,
      "TreatMissingData": "notBreaching",
-     "AlarmDescription": f"Hay eventos de SES (rebotes, quejas) en la cola {DLQ}: el webhook de Plunk no los aceptó. Revisa que la API responda."},
+     "AlarmDescription": f"Hay eventos de SES (rebotes, quejas) en la cola {DLQ}: el webhook de Plunk no los aceptó. Revisa que la API responda. Plunk Lite la vacía solo en cuanto puede."},
 ]
 for a in alarms:
     await call_boto3(service_name="cloudwatch", operation_name="PutMetricAlarm", region_name=R, params={**common, **a})
