@@ -66,6 +66,7 @@ También es más segura al enviar en volumen. Revisada en octubre de 2026 antes 
   - Cada 5 minutos un barrido recupera las ejecuciones que nada despertaba: vuelve a programar el fin de un DELAY o de una espera que se perdió, y da por fallidas, con aviso, las que se quedaron a medias.
 - **Envío resiliente (lote E1).**
   - El envío se adapta a lo que SES dice de toda la cuenta, sin gastar los intentos de cada email: con el límite de ritmo espera un segundo, con la cuota diaria agotada espera un cuarto de hora, y con la cuenta pausada pausa la cola y lo vuelve a probar cada 30 minutos. La cuota y la pausa salen en los avisos como «Amazon SES».
+  - Para saber si SES ha pausado la cuenta lee su estado, con el permiso `ses:GetAccount` que añade `ses_setup` (aws-ses.md §1), y además lo deduce de los rechazos. Sin el permiso, solo lo deduce, y una pausa con un texto que no conoce puede pasar inadvertida mientras envía un solo dominio.
   - Un email que SES rechaza por sí mismo (una dirección o un remitente sin verificar) falla en el acto, sin reintentos.
   - Una campaña que no cabe en el 95 % de la cuota de 24 horas se rechaza al empezar, contando lo que les falta a las campañas en curso; el otro 5 % queda para transaccionales y workflows.
   - Los emails de una ejecución de workflow cancelada no salen, aunque ya estuvieran en la cola.
@@ -119,8 +120,9 @@ El resto no cambia: el env (con las variables `S3_*` del bucket), los dominios, 
 
 1. Ejecuta `python3 scripts/plunk_lite_latest.py` (sección 4). Si la etiqueta coincide con la del compose, ya está al día. Si no, lee en el repositorio qué cambió entre los dos commits: `https://github.com/joanproductivo/plunk-lite/compare/<commit instalado>...<commit nuevo>`.
 2. Haz una copia de Postgres (operations.md §5).
-3. Cambia la etiqueta de la imagen en el compose y despliega. Si usas el MCP remoto, regenera su compose con el commit nuevo y despliégalo también (mcp-remote.md §8). Si cambian también los `command` de Postgres o Redis (como en la versión con el lote E4), Docker los recrea y la instalación se corta alrededor de un minuto: despliega fuera de una campaña.
-4. Verifica como en la sección 4. Si algo falla, vuelve a la etiqueta anterior con el mismo compose.
+3. Si la política de IAM no tiene aún `ses:GetAccount` (`ses_check` lo muestra en `iam.missing_actions`), ejecuta `ses_setup` otra vez antes de desplegar.
+4. Cambia la etiqueta de la imagen en el compose y despliega. Si usas el MCP remoto, regenera su compose con el commit nuevo y despliégalo también (mcp-remote.md §8). Si cambian también los `command` de Postgres o Redis (como en la versión con el lote E4), Docker los recrea y la instalación se corta alrededor de un minuto: despliega fuera de una campaña.
+5. Verifica como en la sección 4. Si algo falla, vuelve a la etiqueta anterior con el mismo compose.
 
 ## 6. Volver a la imagen oficial
 

@@ -57,6 +57,8 @@ policy = {
             "ses:SetIdentityFeedbackForwardingEnabled", "ses:DeleteIdentity",
             # Plunk comprueba al arrancar que los configuration sets tienen su destino de eventos
             "ses:DescribeConfigurationSet",
+            # Plunk Lite lee el estado de la cuenta (GetAccount, SES v2) para saber si SES la ha pausado
+            "ses:GetAccount",
         ],
         "Resource": "*",
         "Condition": {

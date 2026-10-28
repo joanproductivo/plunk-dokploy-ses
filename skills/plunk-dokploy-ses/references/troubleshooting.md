@@ -51,6 +51,7 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | 403 al usar `segments` en `/v1/track` (Plunk Lite) | Los segmentos solo se admiten con la `sk_` | Llama desde el servidor con la `sk_` |
 | 422 «Some segments cannot take contacts» (Plunk Lite) | Un id de `segments` no existe, es de otro proyecto o es un segmento con filtros | Usa ids de segmentos estáticos del proyecto |
 | 400 «Not enough SES quota» al enviar una campaña (Plunk Lite) | No cabe en el 95 % de la cuota de SES de 24 horas, contando lo enviado y lo que les falta a las campañas en curso | Envíala o prográmala cuando haya cuota, o pide más a AWS |
+| «Could not read the account's status» en el log (Plunk Lite) | La política de IAM no tiene `ses:GetAccount` | Ejecuta `ses_setup` otra vez (aws-ses.md §1). Mientras tanto, la pausa se deduce solo de los rechazos |
 | Aviso «Amazon SES» en el banner y los emails parados (Plunk Lite) | SES dio la cuota diaria por agotada o pausó la cuenta: la cola espera (15 min) o se pausa y prueba cada 30 min | Mira la cuenta en SES (aws-ses.md). El aviso se cierra solo con el primer email que sale |
 | El workflow no se dispara | El nombre del evento no coincide exactamente | Mismo texto, mayúsculas y espacios incluidos |
 | No aparece el selector "Email tracking" | Falta `SES_CONFIGURATION_SET_NO_TRACKING` | Defínela y despliega |

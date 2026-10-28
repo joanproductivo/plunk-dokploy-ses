@@ -110,7 +110,8 @@ if not isinstance(policy, Exception):
         iam["allowed_region"] = cond.get("StringEquals", {}).get("aws:RequestedRegion")
         expected = {"ses:SendRawEmail", "ses:GetSendQuota", "ses:VerifyDomainDkim", "ses:GetIdentityDkimAttributes",
                     "ses:GetIdentityVerificationAttributes", "ses:SetIdentityMailFromDomain",
-                    "ses:SetIdentityFeedbackForwardingEnabled", "ses:DeleteIdentity", "ses:DescribeConfigurationSet"}
+                    "ses:SetIdentityFeedbackForwardingEnabled", "ses:DeleteIdentity", "ses:DescribeConfigurationSet",
+                    "ses:GetAccount"}
         actions = doc["Statement"][0].get("Action", [])
         iam["missing_actions"] = sorted(expected - set([actions] if isinstance(actions, str) else actions))
     except Exception as e:
