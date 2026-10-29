@@ -44,7 +44,7 @@ Y añade funciones que la oficial no tiene:
   - **El secreto no se puede leer:** `GET` en la misma ruta solo dice si hay uno, y `DELETE` lo quita. Duplicar el workflow no lo copia: el duplicado sale sin firma.
   - **Una respuesta que no sea 2xx** hace fallar el paso y avisa. No se reintenta, así que el receptor debe responder 2xx también a lo repetido o ya hecho.
 
-Estas funciones guardan sus datos en siete tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 6).
+Estas funciones guardan sus datos en nueve tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 6).
 
 También es más segura al enviar en volumen. Revisada en octubre de 2026 antes de campañas de miles de emails:
 
@@ -85,6 +85,11 @@ También es más segura al enviar en volumen. Revisada en octubre de 2026 antes 
 - **Eventos en cola.** Entregas, aperturas y clics los procesa el worker, 5 a la vez, en lugar del webhook. Una campaña grande ya no satura la base de datos, y las copias repetidas de SNS se descartan.
 - **Adjuntos guardados.** La limpieza diaria vacía, pasados 90 días, los adjuntos de los emails junto con su cuerpo. Antes se quedaban para siempre en la base de datos.
 - **Abuso.** Las peticiones tienen un tamaño máximo de 2 MB (10 MB en `/v1/send`, y solo 8 grandes a la vez), el login admite 10 intentos cada 15 minutos por email (sin que un `_` en la dirección valga de comodín), y cada proceso tiene un techo de memoria.
+- **La DLQ se vacía sola.** Lo que SNS no consigue entregar al webhook (una caída de más de unos 40 minutos) queda 14 días en la cola `plunk-ses-events-dlq` (aws-ses.md §10). Plunk Lite la lee cuando salta su alarma `ses-eventos-dlq`, cada 15 minutos y desde el botón «Process AWS dead-letter queue now» de Settings → Alerts, y pasa cada mensaje por el mismo webhook, con su firma y su cuenta comprobadas:
+  - procesa los rebotes y las quejas; descarta las entregas, aperturas y clics de más de 24 horas, que contarían dos veces;
+  - un fallo pasajero vuelve a la cola, cada vez más tarde, y nunca se borra mientras la base de datos, Redis o AWS estén caídos;
+  - el rebote o la queja recuperados salen marcados en la actividad del contacto, y cada proyecto ve en un aviso lo que se recuperó para él;
+  - necesita el statement `PlunkDLQ` que añade `ses_setup` (aws-ses.md §1). Sin él, todos los paneles avisan «AWS dead-letter queue not readable».
 
 ## 3. Cuándo recomendarla y cuándo no
 
@@ -145,6 +150,7 @@ Antes, avisa de lo que se pierde si se han usado las funciones propias (sección
 - **API.** Un `/v1/send` con varios destinatarios vuelve a cortarse en el primero que falla (sin 207), las altas con un email que no recibe correo vuelven a entrar, y las variables `PLUNK_LITE_*` se ignoran.
   - Un `/v1/track` con la clave secreta da 401: el formulario que la use tiene que pasar a la `pk_`, o a `POST /contacts` y `POST /events/track`.
   - El campo `segments` se ignora sin error: los contactos no entran en esos segmentos.
+- **DLQ de eventos de SES.** Deja de vaciarse sola: hay que reenviar a mano al webhook lo que quede (aws-ses.md §10), y la alarma `ses-eventos-dlq` se queda en ALARM hasta entonces. El statement `PlunkDLQ` puede quedarse.
 - **MCP remoto.** Vuelve al de npm: regenera su compose sin `--plunk-lite` (mcp-remote.md §2). El de Plunk Lite pide rutas que la oficial no tiene.
 - **Lista de supresión propia.** La oficial no la conoce: una importación o una llamada a `/v1/track` puede volver a suscribir a quien rebotó o se quejó. La supresión de la cuenta de SES sigue bloqueando esos envíos, pero cuentan como intentos. Antes de importar contactos, quita esas direcciones del CSV.
 
