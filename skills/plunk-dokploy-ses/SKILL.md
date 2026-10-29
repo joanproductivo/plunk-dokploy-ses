@@ -30,7 +30,7 @@ Al terminar, la persona tiene:
   - publicar algo en GitHub.
 - **Herramientas:**
   - Con el MCP de Dokploy, usa sus herramientas (`compose-create`, `compose-update`, `domain-create`, `compose-deploy`, `compose-readLogs`…). Sin él, guía a la persona por la interfaz.
-  - Con el MCP oficial de AWS, ejecuta los snippets con `run_script`. Sin él, usa `scripts/run_snippet.py` con un perfil del AWS CLI. Sin ninguno de los dos, guíala por la consola.
+  - Con el MCP oficial de AWS, ejecuta los snippets con `run_script`. Sin él, usa `scripts/run_snippet.py` con un perfil del AWS CLI. Si el perfil es de `aws login` y boto3 da «Unable to locate credentials», actualiza boto3, o exporta las credenciales de la CLI y ejecuta sin `--profile` (ver la cabecera de `run_snippet.py`). Sin ninguno de los dos, guíala por la consola.
 
 ## Fase 0: Decidir antes de tocar nada
 
@@ -117,6 +117,7 @@ Lee references/aws-ses.md. En resumen:
 4. **Prueba de envío.** En el sandbox, solo al simulador de SES o a direcciones verificadas (aws-ses.md §5).
    - Envía a las cuatro direcciones del simulador. En el log de `plunk` deben aparecer `Delivery confirmed`, dos `Permanent bounce received` y `Complaint received`: eso confirma toda la cadena SES → SNS → Plunk, rebotes y quejas incluidos.
    - Para ver el email en un buzón real, verifica antes esa dirección en SES y que la persona pulse el enlace (caduca a las 24 h).
+   - Con Plunk Lite, prueba también el vaciado de la DLQ con `scripts/dlq_test.snippet.py` (references/plunk-lite.md §4). Si se van a poner las alarmas de la Fase 5, mejor después de `ses_alarms`, para probar también que su aviso lanza el vaciado.
 
 ## Fase 4: Salir del sandbox
 

@@ -128,6 +128,20 @@ El resto no cambia: el env (con las variables `S3_*` del bucket), los dominios, 
 - En el log no aparece `Plunk: arrancando…`. En su lugar, pm2 arranca exactamente tres procesos: `App [nginx:0] online`, `App [api:1] online` y `App [worker:2] online`.
 - En el log aparecen `nginx: configuration file /etc/nginx/nginx.conf test is successful` y `URL replacement complete for web`. Si la configuración de nginx o el reemplazo de URLs fallan, el contenedor se para a propósito, en vez de quedarse a medias.
 - `https://envio-api.<dominio>/health` responde 200 y `https://envio.<dominio>` muestra el login.
+- En el log, `Dead-letter queue worker started`.
+
+**Probar el vaciado de la DLQ** (cuando ya estén hechas la Fase 2 y la Fase 3, con `ses_setup`, la suscripción confirmada y el dominio de envío verificado; mejor también con las alarmas de `ses_alarms` y `PANEL=si`). Comprueba de punta a punta que un rebote que SNS no consiguió entregar no se pierde. Con el permiso de la persona:
+1. Desde Plunk, crea el contacto suscrito `success@simulator.amazonses.com`, con un dato que lo marque como prueba (`plunk_create_contact`, o `POST /contacts`), y envíale un email desde el dominio de envío (`plunk_send_email`, o `/v1/send`). Apunta el id del email que devuelve el envío y el del proyecto. Se usa `success@` y no `bounce@`: `bounce@` manda el rebote en vivo, y el de la DLQ sería una copia ya registrada.
+2. Ejecuta `scripts/dlq_test.snippet.py` con `REGION`, `ACCOUNT_ID`, `EMAIL_ID`, `PROJECT_ID` y `FROM` (el remitente del paso 1). Necesita una identidad con permisos de administración de SNS y SQS, no la de `plunk-ses`. Crea un topic y dos colas temporales para que SNS firme un rebote de ese email, lo deja en `plunk-ses-events-dlq` y borra lo temporal al terminar, también si falla. Debe acabar con `rebote firmado en plunk-ses-events-dlq` y `recursos temporales borrados`.
+3. En unos 3 minutos (2,5 medidos) salta la alarma `ses-eventos-dlq` y su aviso lanza el vaciado. Sin alarmas, o si ya estaba en ALARM, lo hace la comprobación de cada 15 minutos. En el log de `plunk` deben salir `Permanent bounce received for success@simulator.amazonses.com` y `[DLQ] Drained: 1 handled, 0 dropped as too old, 0 left for later, 0 given up on`.
+4. **Comprueba:**
+   - la DLQ queda vacía (`ApproximateNumberOfMessages` y `ApproximateNumberOfMessagesNotVisible` a 0);
+   - el contacto queda de baja; no se suprime, porque es una dirección del simulador;
+   - en su ficha, el rebote lleva «Recovered from the AWS dead-letter queue», y la baja, «Removed after a hard bounce»;
+   - el panel muestra el aviso «AWS dead-letter queue» con `Handled: 1 bounce`, y el de la alarma se cierra solo.
+5. La persona borra el contacto de prueba.
+
+Si en el paso 3 sale `[DLQ] Not allowed`, falta el statement `PlunkDLQ`: vuelve a ejecutar `ses_setup`.
 
 ## 5. Actualizar
 

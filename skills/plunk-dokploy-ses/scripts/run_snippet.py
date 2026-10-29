@@ -14,6 +14,12 @@ Ejemplo:
 
 Requisitos: Python 3.8+ y boto3 (pip install boto3), con el perfil ya iniciado
 (aws login --profile ..., aws sso login --profile ..., o claves en ~/.aws).
+
+Un perfil de `aws login` necesita un boto3 reciente (pip install -U boto3): uno antiguo da «Unable to
+locate credentials» aunque la CLI funcione. Sin actualizarlo, exporta las credenciales de la CLI y
+ejecuta sin --profile, que usa las del entorno:
+    eval "$(aws configure export-credentials --profile mi-perfil --format env)"
+    python3 run_snippet.py ses_check.snippet.py --set REGION=eu-north-1 --set ACCOUNT_ID=123456789012
 """
 
 import argparse
@@ -76,7 +82,7 @@ async def run(source, call_boto3):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("snippet", help="archivo *.snippet.py")
-    p.add_argument("--profile", required=True, help="perfil del AWS CLI")
+    p.add_argument("--profile", help="perfil del AWS CLI; sin él, las credenciales del entorno")
     p.add_argument("--set", action="append", default=[], metavar="CLAVE=VALOR",
                    help="valor para un marcador __CLAVE__ (repetible)")
     a = p.parse_args()
@@ -92,7 +98,8 @@ def main():
 
     import boto3  # importado aquí para que --help funcione sin boto3
 
-    session = boto3.Session(profile_name=a.profile)
+    # Con un perfil explícito, boto3 no mira las credenciales del entorno
+    session = boto3.Session(profile_name=a.profile) if a.profile else boto3.Session()
     source = render(Path(a.snippet).read_text(), values)
     result = asyncio.run(run(source, build_call_boto3(session, values["REGION"])))
     print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
