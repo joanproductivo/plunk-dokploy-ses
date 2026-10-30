@@ -11,6 +11,7 @@
 8. Después de cambios en la cuenta
 9. Quitar el seguimiento de aperturas
 10. Que no se pierdan rebotes ni quejas
+11. Dominio de seguimiento propio
 
 ## 1. Qué se crea y por qué
 
@@ -202,3 +203,28 @@ La suscripción tiene que estar confirmada para poner los reintentos y la DLQ: s
 - **Si la cuenta de AWS está en el plan gratuito** (FREE), caduca a los 6 meses o al agotar el crédito, y con ella SES. Pásala a un plan de pago antes (AWS Settings → Billing), con un límite de gasto si se quiere.
 - **Alarmas de CloudWatch (recomendado), con `scripts/ses_alarms.snippet.py`** (`ALARM_EMAIL`, `API_DOMAIN`, `PANEL=si` con Plunk Lite). Un topic SNS `plunk-alarmas` con una suscripción de email y tres alarmas: `AWS/SES Reputation.BounceRate` ≥ 0,04 y `Reputation.ComplaintRate` ≥ 0,0008 (sin dimensiones, `Maximum`, 1 h, `TreatMissingData=ignore`: SES publica esas métricas a intervalos irregulares) y `AWS/SQS ApproximateNumberOfMessagesVisible` de `plunk-ses-events-dlq` ≥ 1 (5 min, `notBreaching`). Caben en la capa gratuita. Con Plunk Lite, suscribe además el topic por HTTPS a `<API>/webhooks/sns` (con los mismos reintentos que los eventos y **sin** DLQ) y las alarmas salen también en el banner del panel.
 - **Que la cuenta ya salió del sandbox.** En el sandbox el límite es de 200 emails al día.
+
+## 11. Dominio de seguimiento propio
+
+Por defecto, en los emails con seguimiento SES reescribe los enlaces y el píxel de apertura con su dominio compartido (`r.<región>.awstrack.me`). Con un subdominio propio, los enlaces coinciden con la marca y no dependen de ese dominio. Se hace en AWS y en el DNS: no se añade en el panel de Plunk ni en Dokploy, y no pasa por el servidor (destinatario → Cloudflare → AWS → destino del enlace), así que Traefik no interviene.
+
+Es **una por configuration set**: todos los emails con seguimiento de la instalación usan el mismo subdominio, aunque salgan desde varios dominios. Solo se configura en `plunk-configuration-set`; `plunk-no-tracking-configuration-set` no reescribe enlaces.
+
+Conviene hacerlo antes del primer envío grande. Pasos, con Cloudflare y `example.com` como ejemplo:
+
+1. **Elige el subdominio.** `click.example.com`, de **un solo nivel**: el certificado gratuito de Cloudflare no cubre `click.news.example.com` y el HTTPS fallaría.
+2. **Crea el registro** en la zona `example.com`: CNAME `click` → `r.<región>.awstrack.me`, con **nube naranja** (es lo que da el HTTPS). El modo SSL/TLS debe ser Full o Full (strict), no Flexible.
+3. **Comprueba el HTTPS:** `curl --head https://click.example.com/favicon.ico` tiene que dar `200`, `x-amz-ses-region: <región>` y `x-amz-ses-request-protocol: https`. Si no, para aquí.
+4. **Verifica el dominio en SES.** Si `example.com` ya es una identidad verificada en esa cuenta, sáltate este paso. Si solo lo está `news.example.com`, no basta: crea la identidad del subdominio, sin añadir el dominio principal al panel de Plunk, para que el proyecto no pueda enviar desde él.
+   - `sesv2:CreateEmailIdentity` con `EmailIdentity: click.example.com`.
+   - Añade los 3 CNAME de DKIM que devuelve, con **nube gris**: `<token>._domainkey.click` → `<token>.dkim.amazonses.com`.
+   - Espera a que `sesv2:GetEmailIdentity` dé `DkimAttributes.Status: SUCCESS`. En la instalación de referencia tardó unos 10 minutos.
+5. **Asígnalo, con la confirmación de la persona.** Hazlo solo con los pasos 3 y 4 bien hechos: desde ese momento todos los emails con seguimiento usan este dominio, y si no funciona sus enlaces se rompen. Los emails ya enviados no cambian.
+   ```bash
+   aws sesv2 put-configuration-set-tracking-options --configuration-set-name plunk-configuration-set --custom-redirect-domain click.example.com --https-policy REQUIRE --region <región>
+   ```
+6. **Prueba con una campaña, no con `/v1/send`.** Con «Email tracking» en «Marketing only», un envío transaccional sale sin seguimiento y su enlace va directo, sin probar nada. Crea una campaña filtrada a una sola dirección (`email` `equals`) y comprueba `totalRecipients: 1` antes de enviarla. El enlace del email debe empezar por `https://click.example.com/`, abrir su destino y sumar en `clickedCount` de la campaña. En el sandbox, la dirección tiene que estar verificada.
+
+**Si el proxy no da HTTPS:** la vía que documenta AWS es CloudFront, con `r.<región>.awstrack.me` como origen y la cabecera `Host` de quien pide reenviada al origen. Su certificado de ACM tiene que estar en `us-east-1`; comprueba antes que la cuenta lo permite.
+
+**Quitarlo:** repite el comando del paso 5 sin `--custom-redirect-domain`. Mantén el CNAME mientras queden emails enviados con ese dominio, o sus enlaces dejarán de funcionar.
