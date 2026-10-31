@@ -111,7 +111,7 @@ if not isinstance(policy, Exception):
         expected = {"ses:SendRawEmail", "ses:GetSendQuota", "ses:VerifyDomainDkim", "ses:GetIdentityDkimAttributes",
                     "ses:GetIdentityVerificationAttributes", "ses:SetIdentityMailFromDomain",
                     "ses:SetIdentityFeedbackForwardingEnabled", "ses:DeleteIdentity", "ses:DescribeConfigurationSet",
-                    "ses:GetAccount"}
+                    "ses:GetAccount", "ses:DeleteSuppressedDestination"}
         actions = doc["Statement"][0].get("Action", [])
         iam["missing_actions"] = sorted(expected - set([actions] if isinstance(actions, str) else actions))
         # Plunk Lite vacía la DLQ con un segundo statement, solo sobre esa cola

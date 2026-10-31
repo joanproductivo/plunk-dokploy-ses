@@ -59,6 +59,8 @@ policy = {
             "ses:DescribeConfigurationSet",
             # Plunk Lite lee el estado de la cuenta (GetAccount, SES v2) para saber si SES la ha pausado
             "ses:GetAccount",
+            # Plunk Lite: «Remove suppression» en la ficha del contacto saca la dirección también de la lista de SES
+            "ses:DeleteSuppressedDestination",
         ],
         "Resource": "*",
         "Condition": {
