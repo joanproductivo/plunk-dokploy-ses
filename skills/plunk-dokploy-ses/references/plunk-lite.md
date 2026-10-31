@@ -145,6 +145,13 @@ El resto no cambia: el env (con las variables `S3_*` del bucket), los dominios, 
 
 Si en el paso 3 sale `[DLQ] Not allowed`, falta el statement `PlunkDLQ`: vuelve a ejecutar `ses_setup`.
 
+**Probar «Remove suppression»** (opcional, con el sí de la persona). Usa un alias suyo (`nombre+prueba@…`): con las direcciones del simulador, Plunk no registra la supresión. Hazlo en una instalación sin workflows que reaccionen a `contact.unsubscribed` o `email.bounce`, porque se dispararían.
+1. Con una identidad de administración: `aws sesv2 put-suppressed-destination --email-address <alias> --reason BOUNCE --region <región>`.
+2. Crea el contacto suscrito, con un dato que lo marque como prueba, y envíale un email. SES responde `OnAccountSuppressionList` en segundos, no se entrega nada y el contacto sale `Suppressed · bounce`.
+3. La persona abre su ficha, pulsa **Remove suppression** y confirma: solo funciona con sesión del panel. Debe salir el mensaje de éxito, y `aws sesv2 get-suppressed-destination --email-address <alias> --region <región>` debe dar `NotFoundException`. Si sale el aviso de que no se ha quitado en SES, falta el permiso: ejecuta `ses_setup` y repite desde el paso 2.
+4. Envíale otro email: debe salir `Delivery confirmed` en el log, llegar al buzón y no volver a suprimirse.
+5. Borra el contacto y comprueba que el alias no sigue en la lista de SES, también si la prueba se corta a medias.
+
 ## 5. Actualizar
 
 1. Ejecuta `python3 scripts/plunk_lite_latest.py` (sección 4). Si la etiqueta coincide con la del compose, ya está al día. Si no, lee en el repositorio qué cambió entre los dos commits: `https://github.com/joanproductivo/plunk-lite/compare/<commit instalado>...<commit nuevo>`.

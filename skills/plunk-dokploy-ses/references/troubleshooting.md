@@ -32,6 +32,11 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | No se puede cambiar el plan de precios de SES | Hay una petición de producción en revisión | Espera la respuesta de AWS |
 | AWS deniega la producción | Falta contexto de cómo se obtienen los contactos, o la web no muestra formulario | Responder en el mismo caso (aws-ses.md §6), sin reenviar la petición |
 | DKIM `PENDING` o `FAILED` | Registros DNS mal o en otra zona | `check_dns.sh` y dns.md §4 |
+| «Removed here, but not at SES» al quitar una supresión (Plunk Lite) | La política de `plunk-ses` no tiene `ses:DeleteSuppressedDestination` (en el log, `AccessDeniedException`) | Ejecuta `ses_setup` otra vez. No hay que reiniciar. Si SES aún la tiene, el siguiente envío la suprime otra vez: quítala de nuevo |
+| «SES did not answer» al quitar una supresión (Plunk Lite) | SES no respondió en 2 s, o las claves de AWS no valen. No se ha quitado de Plunk | Reinténtalo. Si se repite, mira el mensaje en el log (`[SES] Could not remove`) |
+| Una persona no recibe nada, aunque está suscrita (Plunk Lite) | Su dirección está en la lista de supresión | Filtra por «Suppressed» en Contactos. Quítala en su ficha solo si te ha pedido volver, sobre todo tras una queja |
+| El filtro «Suppressed» da «too many to filter on» (Plunk Lite) | Más de 20.000 suprimidos con contacto en el proyecto | El filtro no se puede usar. Etiquetas, fichas y envíos siguen igual |
+| `[WORKFLOW-RECOVERY] Sweeping again after a gap` en el log (Plunk Lite) | Normal 2 o 3 veces tras arrancar: las ejecuciones colgadas no se revisan hasta llevar 10 minutos de barridos seguidos | Nada, salvo que siga pasados unos 15 minutos o reaparezca sin reinicio: entonces mira si Redis o la base de datos se han caído |
 | Plunk Lite avisa «AWS dead-letter queue not readable» | La política de `plunk-ses` no tiene el statement `PlunkDLQ`, o la DLQ es de otra región o cuenta | Ejecuta `ses_setup` otra vez (aws-ses.md §2); el aviso se cierra solo con la siguiente lectura correcta |
 
 ## Uso
