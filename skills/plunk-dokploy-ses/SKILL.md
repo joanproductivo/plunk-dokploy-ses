@@ -1,6 +1,6 @@
 ---
 name: plunk-dokploy-ses
-description: Despliega y configura Plunk self-hosted (useplunk/plunk, email marketing y transaccional open source) en Dokploy con AWS SES, de principio a fin. Incluye un compose probado y recortado en memoria, dominios con Traefik y Let's Encrypt, usuario IAM mínimo, configuration sets y SNS para eventos, registros DNS con las trampas de Cloudflare, salida del sandbox de SES y plan de precios. También cubre el envío desde una web por API (/v1/send, /v1/track), workflows, aperturas falsas, mantenimiento y el MCP de Plunk publicado con login para usarlo desde claude.ai. Permite usar la imagen oficial o Plunk Lite, un fork ligero no oficial. Úsala siempre que alguien quiera instalar, revisar, actualizar o arreglar Plunk en Dokploy o Docker con SES. También para conectar Plunk a AWS SES, verificar un dominio de envío, pedir producción en SES para Plunk o mandar emails de su web a través de Plunk, aunque no mencione Dokploy ni esta skill. En inglés también aplica (self-host Plunk, Plunk on Dokploy, Plunk SES setup).
+description: Despliega y configura Plunk self-hosted (useplunk/plunk, email marketing y transaccional open source) en Dokploy con AWS SES. Incluye un compose probado y recortado en memoria, dominios con Traefik y Let's Encrypt, usuario IAM mínimo, configuration sets y SNS para eventos, DNS con Cloudflare y su MCP, subdominios para transaccional y marketing, salida del sandbox de SES y plan de precios. También cubre el envío desde una web por API (/v1/send, /v1/track), workflows, aperturas falsas, mantenimiento y el MCP de Plunk publicado con login para usarlo desde claude.ai. Permite usar la imagen oficial o Plunk Lite, un fork ligero no oficial. Úsala siempre que alguien quiera instalar, revisar, actualizar o arreglar Plunk en Dokploy o Docker con SES. También para conectar Plunk a AWS SES, verificar un dominio de envío, pedir producción en SES para Plunk o mandar emails de su web a través de Plunk, aunque no mencione Dokploy ni esta skill. En inglés también aplica (self-host Plunk, Plunk on Dokploy, Plunk SES setup).
 ---
 
 # Plunk en Dokploy con AWS SES
@@ -31,6 +31,7 @@ Al terminar, la persona tiene:
 - **Herramientas:**
   - Con el MCP de Dokploy, usa sus herramientas (`compose-create`, `compose-update`, `domain-create`, `compose-deploy`, `compose-readLogs`…). Sin él, guía a la persona por la interfaz.
   - Con el MCP oficial de AWS, ejecuta los snippets con `run_script`. Sin él, usa `scripts/run_snippet.py` con un perfil del AWS CLI. Si el perfil es de `aws login` y boto3 da «Unable to locate credentials», actualiza boto3, o exporta las credenciales de la CLI y ejecuta sin `--profile` (ver la cabecera de `run_snippet.py`). Sin ninguno de los dos, guíala por la consola.
+  - Con el MCP de Cloudflare, crea tú los registros DNS (dns.md §8). Si la persona usa Cloudflare y no lo tiene, ofrécele conectarlo. Sin él, guíala por el panel.
 
 ## Fase 0: Decidir antes de tocar nada
 
@@ -41,7 +42,7 @@ Pregunta solo lo que no sepas ya:
    - El dominio del panel aparece en los enlaces de baja y en las imágenes de todos los emails. Cambiarlo después obliga a mantener el viejo meses (operations.md §8).
    - Si varias marcas comparten instalación, todas verán ese dominio.
    - Usa un solo nivel de subdominio, porque el certificado gratuito de Cloudflare no cubre más.
-3. **Dominio de envío.** Recomienda un subdominio dedicado (`news.<dominio>`), distinto de los tres de la instalación (dns.md §3).
+3. **Dominio de envío.** Recomienda un subdominio dedicado (`news.<dominio>`), distinto de los tres de la instalación (dns.md §3). Si va a enviar transaccional y marketing, recomienda uno para cada cosa y explica en una frase por qué: una mala campaña no debe llevar a spam un acceso o un recibo (dns.md §7).
 4. **Región de SES.** La de la cuenta de AWS. Se usa la misma en todo.
 5. **Buzón para respuestas.** Plunk no recibe correo. Comprueba que la dirección de respuesta tiene un buzón que funcione (using-plunk.md §7).
 6. **Dónde guardar las imágenes del editor.** Plunk las sube a un almacenamiento S3 y las enlaza en los emails. La plantilla no lleva MinIO: usa un bucket externo, por defecto Cloudflare R2 (10 GB gratis, sin coste de salida, y no gasta memoria del servidor). La persona crea el bucket, conecta `envio-files.<dominio>` como dominio propio del bucket (en R2: Settings → Custom Domains; hace público el bucket) y crea un token con lectura y escritura solo en ese bucket. Apunta el endpoint (`https://<account_id>.r2.cloudflarestorage.com`) y el nombre del bucket; las claves del token se pegan en Dokploy en la Fase 2. Si no quiere un servicio externo, ver operations.md §6 (MinIO en el servidor o sin subidas).
@@ -105,8 +106,8 @@ Lee references/aws-ses.md. En resumen:
 
 ## Fase 3: Dominio de envío
 
-1. La persona añade el dominio de envío en el panel de Plunk (Settings → Domains). Plunk crea la identidad en SES y muestra 5 registros: 3 CNAME de DKIM, y un MX y un TXT en `plunk.<dominio de envío>`.
-2. Ayúdale a crearlos (dns.md §3):
+1. La persona añade el dominio de envío en el panel de Plunk (Settings → Domains). Si hay dos subdominios, cada uno por separado (dns.md §7). Plunk crea la identidad en SES y muestra 5 registros: 3 CNAME de DKIM, y un MX y un TXT en `plunk.<dominio de envío>`. También muestra un MX opcional de entrada, que no se crea.
+2. Créalos con el MCP de Cloudflare (dns.md §8) o ayúdale a crearlos en su panel (dns.md §3):
    - **Todos con nube gris.**
    - Créalos en la zona correcta, con el nombre relativo a la zona.
    - Sin el MX opcional de "inbound".
@@ -167,6 +168,7 @@ Propón estos ajustes y explica cada uno en una frase. Los cambios de env los ha
 Cada punto salió de un error real:
 
 - **El dominio de envío no es el del panel.** Si añades `envio.<dominio>` como dominio de envío, puedes romper el panel: sus registros anulan el comodín del DNS. Usa siempre un subdominio aparte.
+- **Separar transaccional y marketing por subdominio protege la reputación del dominio, no la de la cuenta.** Las tasas de SES y la supresión siguen siendo comunes (dns.md §7).
 - **Los registros de DKIM van con nube gris.** Con la naranja, AWS no puede verificarlos.
 - **Cloudflare sí admite nombres DNS de varios niveles** (`plunk.news`). Lo que solo cubre un nivel es su certificado gratuito para webs.
 - **Revisa la zona antes de crear registros.** Si la persona tiene varios dominios en la misma cuenta de Cloudflare, es fácil equivocarse de zona.

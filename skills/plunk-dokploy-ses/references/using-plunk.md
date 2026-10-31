@@ -37,7 +37,7 @@ Muchas plataformas (webs de cursos, comunidades, formularios) permiten enviar su
   "to": "{{email}}",
   "subject": "{{asunto}}",
   "body": "{{html}}",
-  "from": { "name": "Nombre visible", "email": "hola@news.example.com" },
+  "from": { "name": "Nombre visible", "email": "hola@avisos.example.com" },
   "reply": "buzon-real@example.com"
 }
 ```
@@ -46,7 +46,7 @@ Muchas plataformas (webs de cursos, comunidades, formularios) permiten enviar su
 - `subject` y `body` son obligatorios (o un `template` de Plunk). Campos admitidos: `to`, `subject`, `body`, `from`, `reply`, `headers`, `data`, `subscribed`, `template`, `attachments`. Cualquier otro se ignora.
 - **Adjuntos: unos 7 MB en total como máximo.** El nginx de la imagen corta las peticiones de más de 10 MB, y los adjuntos van en base64, que ocupa un tercio más. SES admitiría hasta 40 MB, pero la petición no llega.
 - **Para envíos en masa, enlaza el archivo en vez de adjuntarlo.** Las campañas no admiten adjuntos, y cada email transaccional guarda el suyo entero en la base de datos: un PDF de 5 MB enviado a 5.000 personas son unos 33 GB, más ese tráfico de subida a SES. Plunk Lite sube el archivo al almacenamiento del proyecto desde el editor («Link to a file» en el botón, «File…» en el enlace) y cada destinatario lo descarga solo si lo abre. Con la imagen oficial, súbelo a cualquier almacenamiento público y enlázalo.
-- `from.email` debe estar en un **dominio de envío verificado** (no en la raíz si solo está verificado un subdominio).
+- `from.email` debe estar en un **dominio de envío verificado** (no en la raíz si solo está verificado un subdominio). Si la instalación envía también boletines, usa aquí un subdominio distinto al suyo (dns.md §7).
 - `reply` debe ser un **buzón que exista**: Plunk no recibe correo, y sin `reply` las respuestas irían a la dirección de envío, que normalmente no tiene buzón. Comprueba que el dominio del buzón tiene MX y un servidor que responda.
 - El HTML va dentro de una cadena JSON: la plataforma tiene que escapar comillas y saltos de línea al insertar `{{html}}`. Si no lo hace, Plunk responde 400.
 - `to` admite de 1 a 50 destinatarios.
