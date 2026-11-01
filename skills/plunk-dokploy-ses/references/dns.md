@@ -9,6 +9,7 @@
 6. Comprobar
 7. Un subdominio para transaccional y otro para marketing
 8. Crear los registros con el MCP de Cloudflare
+9. Google Postmaster Tools
 
 ## 1. Los dos tipos de registros
 
@@ -92,7 +93,7 @@ No es obligatorio: Plunk envía igual con un solo dominio. Es la práctica recom
 
 **Por qué:**
 - **Marketing arriesga más.** Los boletines reciben muchas más quejas y borrados sin abrir que un email que la persona ha pedido. Gmail y otros proveedores valoran la reputación por dominio, así que una mala campaña no debería mandar a spam un enlace de acceso o un recibo.
-- **Se puede ver cada tipo por separado.** Cada subdominio tiene su propia reputación en herramientas como Google Postmaster Tools, y un problema se localiza antes.
+- **Se puede ver cada tipo por separado.** Cada subdominio tiene su propia reputación en Google Postmaster Tools (§9), y un problema se localiza antes.
 - **Cuesta poco.** Son los mismos 5 registros otra vez, y no tocan el correo de la raíz.
 
 **Lo que no separa:**
@@ -147,3 +148,17 @@ El MCP expone `search`, para consultar la API, y `execute`, que ejecuta JavaScri
 - Crear registros nuevos para un dominio de envío entra en lo que te pide la persona. Modificar o borrar registros existentes, o tocar el MX, el SPF o el DMARC de la raíz, necesita un sí expreso: puede cortar el correo o la web. Antes de borrar, enseña el registro.
 - No crees el MX opcional de «Inbound email» (§3).
 - Si `_dmarc` no existe, proponlo (§5) y créalo con su sí.
+
+## 9. Google Postmaster Tools
+
+Enseña lo que Gmail opina de tus envíos: tasa de spam que marcan sus usuarios, autenticación y errores de entrega. SES no da ese dato, y es el primer sitio donde mirar si Gmail empieza a mandar a spam o a rechazar. Es gratis y no toca Plunk.
+
+1. Con la cuenta de Google de la persona, entra en https://postmaster.google.com y añade el dominio raíz y cada dominio de envío (`news.example.com`).
+2. Google da un registro TXT o CNAME para verificar. Créalo con su sí, nube gris si es CNAME (§8). Es un registro nuevo: no cambies ningún TXT existente.
+3. Pulsa verificar. Puede tardar si el DNS aún no se ha propagado.
+
+Avisa de dos cosas:
+- **Sin volumen a Gmail no hay datos.** Con listas pequeñas puede salir vacío durante mucho tiempo: no es un fallo.
+- **Los datos llegan con retraso.** Sirve para ver tendencias, no para vigilar un envío en curso.
+
+Si la tasa de spam sube, baja el ritmo y limpia la lista antes de seguir: los avisos de Plunk miden las quejas que le llegan por SES, y Gmail no las notifica todas.

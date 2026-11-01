@@ -61,6 +61,9 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | 400 «Not enough SES quota» al enviar una campaña (Plunk Lite) | No cabe en el 95 % de la cuota de SES de 24 horas, contando lo enviado y lo que les falta a las campañas en curso | Envíala o prográmala cuando haya cuota, o pide más a AWS |
 | «Could not read the account's status» en el log (Plunk Lite) | La política de IAM no tiene `ses:GetAccount` | Ejecuta `ses_setup` otra vez (aws-ses.md §1). Mientras tanto, la pausa se deduce solo de los rechazos |
 | Aviso «Amazon SES» en el banner y los emails parados (Plunk Lite) | SES dio la cuota diaria por agotada o pausó la cuenta: la cola espera (15 min) o se pausa y prueba cada 30 min | Mira la cuenta en SES (aws-ses.md). El aviso se cierra solo con el primer email que sale |
+| Aviso «Temporary bounces» con varios contactos del mismo proveedor (Plunk Lite) | El proveedor puede estar rechazando al remitente, no ser buzones muertos | Mira la reputación (dns.md §9) y quita esas supresiones en la ficha, una a una. Filtra Contactos por Suppressed para verlos todos |
+| «Temporary bounces»: «no more are until the count drops» (Plunk Lite) | Freno de unos 20 cortes en 7 días | Quitar supresiones no lo baja: revisa la causa; los buzones muertos siguen sin cortarse hasta que baje la cuenta |
+| Clics en las estadísticas que nadie hizo, o un workflow que arranca solo | Antivirus que SES no marca como automáticos | Plunk Lite solo descarta los `Likely`; no hagas depender de un clic algo importante |
 | El workflow no se dispara | El nombre del evento no coincide exactamente | Mismo texto, mayúsculas y espacios incluidos |
 | No aparece el selector "Email tracking" | Falta `SES_CONFIGURATION_SET_NO_TRACKING` | Defínela y despliega |
 | "He olvidado mi contraseña" no envía nada | Platform emails desactivados | `PLUNK_API_KEY` + `PLUNK_FROM_ADDRESS` (using-plunk.md §5) |
