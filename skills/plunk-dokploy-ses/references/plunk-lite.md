@@ -15,7 +15,7 @@ La imagen se publica en `ghcr.io/joanproductivo/plunk-lite`, es pública y tiene
 
 ## 2. Qué lleva
 
-Frente a la imagen oficial, no lleva landing, wiki ni relay SMTP, nginx sirve el panel como ficheros estáticos, no carga la analítica de Plunk y ocupa ~0,7 GB sin comprimir frente a ~1,6 GB (0.18.0, medido el 2026-11-01).
+Frente a la imagen oficial, no lleva landing, wiki ni relay SMTP, nginx sirve el panel como ficheros estáticos, no carga el script de analítica del servicio alojado de Plunk (las estadísticas de los emails siguen todas) y ocupa ~0,7 GB sin comprimir frente a ~1,6 GB (0.18.0, medido el 2026-11-01).
 
 Además lleva arreglos de fallos que la oficial aún no tiene, como las tasas del dashboard correctas. También lleva los arreglos de seguridad y de workflows de la 0.18.0. El detalle está en los commits del repositorio.
 
