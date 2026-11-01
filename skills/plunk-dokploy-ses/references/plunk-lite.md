@@ -10,7 +10,7 @@
 
 ## 1. Qué es
 
-[Plunk Lite](https://github.com/joanproductivo/plunk-lite) es un fork **no oficial** de Plunk pensado solo para self-hosting. Lo mantiene una persona, no el equipo de Plunk. Parte de una versión de Plunk (hoy, la 0.17.0) y le añade arreglos que aún no están en la oficial, además de una imagen más pequeña.
+[Plunk Lite](https://github.com/joanproductivo/plunk-lite) es un fork **no oficial** de Plunk pensado solo para self-hosting. Lo mantiene una persona, no el equipo de Plunk. Parte de una versión de Plunk (hoy, la 0.17.0, con lo elegido de la 0.18.0) y le añade arreglos que aún no están en la oficial, además de una imagen más pequeña.
 
 La imagen se publica en `ghcr.io/joanproductivo/plunk-lite`, es pública y tiene la misma licencia que Plunk (AGPL-3.0). Usa la misma base de datos y las mismas variables que la oficial: se puede pasar de una a otra cambiando la imagen del compose.
 
@@ -25,7 +25,9 @@ La imagen se publica en `ghcr.io/joanproductivo/plunk-lite`, es pública y tiene
 | Memoria del contenedor | ~190–230 MB | ~190 MB recién arrancado (Node 24 gasta algo más por proceso, pero no hay proceso del panel) |
 | Analítica de Plunk en el panel | Sí (carga un script de terceros en cada visita) | No |
 
-Además lleva arreglos de fallos que la oficial aún no tiene. Por ejemplo, las aperturas automáticas que SES marca como tales ya no cuentan, las tasas del dashboard son correctas, cancelar un workflow detiene sus esperas y los nombres con acentos o emojis salen bien en las cabeceras y los adjuntos. También adelanta arreglos de la próxima versión de Plunk (0.18.0). El detalle está en los commits del repositorio.
+Además lleva arreglos de fallos que la oficial aún no tiene, como las tasas del dashboard correctas. También lleva los arreglos de seguridad y de workflows de la 0.18.0. El detalle está en los commits del repositorio.
+
+**Lo que tiene la oficial 0.18.0 y Plunk Lite no:** programar envíos (`delivery.at`) y limitar repeticiones (`delivery.throttle`, también al entrar en un workflow), `List-Unsubscribe` con enlace propio en envíos headless, y la lista de campos de contacto servida desde Redis, pensada para millones de contactos.
 
 Y añade funciones que la oficial no tiene:
 
@@ -109,7 +111,7 @@ También es más segura al enviar en volumen. Revisada en octubre de 2026 antes 
 **No la recomiendes** si:
 - necesita el relay SMTP: Plunk Lite no lo lleva;
 - quiere solo software del proyecto oficial o soporte del equipo de Plunk;
-- necesita una versión de Plunk que Plunk Lite aún no ha incorporado. Plunk Lite sigue a la oficial con algo de retraso.
+- necesita algo de una versión de Plunk que Plunk Lite no ha incorporado, como programar envíos o el throttling de la 0.18.0. Plunk Lite elige lo que coge de cada versión, así que no todo llega.
 
 Explica las dos opciones en una frase cada una y deja elegir a la persona. Si duda, la oficial con el arranque recortado es la opción por defecto.
 
@@ -188,6 +190,6 @@ Antes, avisa de lo que se pierde si se han usado las funciones propias (sección
 Los datos no se borran: quedan en las tablas `plunk_lite_*` y vuelven a usarse si se regresa a Plunk Lite.
 
 1. Haz una copia de Postgres.
-2. Pon la imagen oficial (`ghcr.io/useplunk/plunk:<versión>`) en una versión igual o más nueva que la base de Plunk Lite. Si eliges una más antigua, la base de datos podría tener migraciones que esa versión no conoce.
+2. Pon la imagen oficial (`ghcr.io/useplunk/plunk:<versión>`) en una versión igual o más nueva que la base de Plunk Lite. Si eliges una más antigua, la base de datos podría tener migraciones que esa versión no conoce. Desde la 0.18.0, la oficial aplica una migración que Plunk Lite no lleva, con valores nuevos en un enum que no se quitan con facilidad. Volver después a Plunk Lite no está medido: cuenta con restaurar la copia del paso 1.
 3. Vuelve a poner el bloque `entrypoint`/`command` de `assets/docker-compose.yml`, o el contenedor arrancará también landing, wiki y SMTP.
 4. Despliega y verifica como en la Fase 1 de SKILL.md.
