@@ -106,7 +106,7 @@ La Fase 1 de SKILL.md usa `assets/docker-compose.yml`, que ya lleva Plunk Lite. 
    ```yaml
    image: ghcr.io/joanproductivo/plunk-lite:sha-<commit>
    ```
-   Plunk Lite publica cada versión como `sha-<commit>` y, además, la más reciente como `latest` (sale de la rama `plunk-lite` del repositorio). En el compose usa siempre la `sha-<commit>`, no `latest`: con `latest`, cualquier despliegue o reinicio del servidor podría cambiar de versión sin que nadie lo decida y sin copia previa de la base de datos.
+   Plunk Lite publica cada versión como `sha-<commit>` y, además, la más reciente como `latest` (sale de la rama `plunk-lite` del repositorio). En el compose usa siempre la `sha-<commit>`, no `latest`: con `latest`, cualquier despliegue o reinicio del servidor podría cambiar de versión sin que nadie lo decida y sin copia previa de la base de datos. Las versiones con nombre (`lite-1.0.0`) son etiquetas del repositorio que marcan hitos: no hay imagen con ese nombre, y cada release indica su `sha-`.
 **Si la instalación ya corre con la oficial 0.18 o más**, también se pasa cambiando la imagen, y quitando el bloque `entrypoint`/`command` si lo lleva. Haz antes una copia de Postgres y comprueba que no quedan emails programados ni cancelados:
 ```sql
 SELECT status, count(*) FROM emails WHERE status IN ('SCHEDULED', 'CANCELLED') GROUP BY 1;
