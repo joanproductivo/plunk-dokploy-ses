@@ -51,7 +51,7 @@ else:
     dockerfile = """# syntax=docker/dockerfile:1
 FROM node:22-alpine
 WORKDIR /app
-RUN npm install --omit=dev --no-audit --no-fund @plunk/mcp@0.17.0 """ + SDK + """ && npm ls
+RUN npm install --omit=dev --no-audit --no-fund @plunk/mcp@0.18.0 """ + SDK + """ && npm ls
 """ + SERVER
 
 assert '$' not in dockerfile, 'el Dockerfile no puede llevar $: Compose lo interpretaría como variable'

@@ -26,6 +26,8 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | No aparece `AWS SES quota: …` en el log; errores `InvalidClientTokenId` | Claves aún de ejemplo o mal pegadas | La persona revisa `AWS_SES_ACCESS_KEY_ID`/`SECRET` y despliega |
 | `AccessDenied` en SES con claves correctas | Cambió la IP pública del servidor, o la región no coincide | Ejecuta `ses_setup` con la IP nueva; misma región en env y AWS |
 | Plunk no marca entregas, aperturas ni rebotes | Suscripción SNS sin confirmar o eventos sin configurar | `ses_check`; aws-ses.md §1 "Orden" |
+| `[WEBHOOK] SNS message rejected — topic is not in this AWS account` en el log | El topic está en otra cuenta que las claves de SES (Plunk 0.18 o más) | Usa claves y topic de la misma cuenta (aws-ses.md §1) |
+| SNS recibe 503 `Could not verify SNS topic`; en el log, `[SNS] Could not look up the AWS account` | Plunk no pudo llamar a STS: claves mal pegadas o sin salida a `sts.<región>.amazonaws.com` | Revisa las claves y la salida a internet; SNS reintenta, así que los eventos no se pierden mientras dure su margen |
 | En el sandbox no llega el email | El destinatario no está verificado en SES | Envía al simulador o verifica la dirección (aws-ses.md §5) |
 | La dirección verificada sigue en `PENDING` | No se pulsó el enlace de AWS, o caducó (24 h) | Mira Spam y Promociones; si caducó, borra la identidad y créala otra vez (aws-ses.md §5) |
 | Tras salir del sandbox sigue enviando a 1/s | Plunk lee la cuota solo al arrancar | Reinicia el contenedor `plunk` |
@@ -53,7 +55,7 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | 429 en `/v1/track`, `/v1/send` o contactos | Límite de peticiones por proyecto (`RATE_LIMIT_ENABLED`, activado en la plantilla) | Respeta `Retry-After`. Si una integración propia lo necesita de verdad, sube `RATE_LIMIT_*_PER_SECOND` en el env |
 | Emails marcados como abiertos sin abrir | Precarga del píxel por Gmail/Apple/antivirus | using-plunk.md §4 |
 | Enlaces de acceso que "ya se usaron" | El seguimiento de clics y los antivirus los abren antes | Tracking en "Marketing only" |
-| El dashboard marca un porcentaje de aperturas o clics más bajo que las campañas | Con tracking "Marketing only" o "Disabled", Plunk 0.17 cuenta en el total los emails sin seguimiento (useplunk/plunk#533) | Mira la página de la campaña o Analytics filtrado por stream (using-plunk.md §4) |
+| El dashboard marca un porcentaje de aperturas o clics más bajo que las campañas | Con tracking "Marketing only" o "Disabled", Plunk (también la 0.18) cuenta en el total los emails sin seguimiento (useplunk/plunk#533) | Mira la página de la campaña o Analytics filtrado por stream (using-plunk.md §4) |
 | Altas de eventos suscriben a gente sin consentimiento | `/v1/track` sin `"subscribed": false` | Añádelo |
 | 403 «Public keys are switched off» en `/v1/track` (Plunk Lite) | `PLUNK_LITE_PUBLIC_TRACK=off` y la llamada usa la `pk_` | Llámalo desde el servidor con la `sk_`, o vuelve a poner `on` |
 | 403 al usar `segments` en `/v1/track` (Plunk Lite) | Los segmentos solo se admiten con la `sk_` | Llama desde el servidor con la `sk_` |
@@ -68,7 +70,7 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | No aparece el selector "Email tracking" | Falta `SES_CONFIGURATION_SET_NO_TRACKING` | Defínela y despliega |
 | "He olvidado mi contraseña" no envía nada | Platform emails desactivados | `PLUNK_API_KEY` + `PLUNK_FROM_ADDRESS` (using-plunk.md §5) |
 | Las respuestas a los emails se pierden | `reply` apunta a un dominio sin buzón o sin servidor de correo activo | Usa un buzón real; comprueba su MX |
-| `[WEBHOOK] Unknown event type: Send` en el log | El configuration set publica SEND (montado con una versión anterior de esta skill) y Plunk 0.17 no lo usa | Inofensivo, pero duplica las llamadas al webhook: quita SEND con `sesv2:UpdateConfigurationSetEventDestination` (mismo `SnsDestination`, `Enabled: true`) en los dos sets |
+| `[WEBHOOK] Unknown event type: Send` en el log | El configuration set publica SEND (montado con una versión anterior de esta skill) y Plunk no lo usa | Inofensivo, pero duplica las llamadas al webhook: quita SEND con `sesv2:UpdateConfigurationSetEventDestination` (mismo `SnsDestination`, `Enabled: true`) en los dos sets |
 
 ## MCP remoto (claude.ai)
 

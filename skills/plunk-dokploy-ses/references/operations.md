@@ -14,17 +14,17 @@
 
 ## 1. Qué corre y cuánto ocupa
 
-Medido con Plunk 0.17.0. El contenedor `plunk` lleva varios programas Node.js gestionados por PM2:
+Medido con Plunk 0.18.0 en local (arm64, a los ~3 minutos de arrancar, sin envíos ni claves de AWS reales); en un servidor puede variar. El contenedor `plunk` lleva varios programas Node.js gestionados por PM2:
 
 | Proceso | Qué hace | Memoria propia |
 |---|---|---|
-| api | API pública y webhooks de SNS | ~71 MB |
-| worker | Colas: envíos, campañas, workflows | ~62 MB |
-| web | El panel | ~51 MB |
-| pm2 + nginx | Supervisor y enrutado por dominio | ~28 MB |
-| wiki, landing, smtp | Docs, web promocional, relay SMTP | ~104 MB (quitados por el arranque recortado) |
+| api | API pública y webhooks de SNS | ~84 MB |
+| worker | Colas: envíos, campañas, workflows | ~75 MB |
+| web | El panel | ~57 MB |
+| pm2 + nginx | Supervisor y enrutado por dominio | ~25 MB |
+| wiki, landing, smtp | Docs, web promocional, relay SMTP | ~145 MB (quitados por el arranque recortado) |
 
-Contenedor: ~330 MB con todo, ~190 MB recortado. Además: Postgres ~98 MB y Redis ~7 MB. Una instalación completa recortada ronda los 300 MB (MinIO, si se monta, suma ~90 MB).
+Contenedor: ~380 MB con todo, ~245 MB recortado (la 0.17.0, medida igual, ~200 MB recortado). Además: Postgres ~35–100 MB y Redis ~10 MB. Una instalación completa recortada ronda los 350 MB (MinIO, si se monta, suma ~90 MB).
 
 Límites que pone la plantilla, para enviar en volumen sin tumbar el servidor:
 
@@ -45,7 +45,7 @@ El compose sustituye `entrypoint`/`command` del servicio `plunk`: copia el scrip
 
 ## 3. Actualizar Plunk
 
-La versión está fijada en el compose (`image: ghcr.io/useplunk/plunk:0.17.0`), así que actualizar es un cambio del compose, no del env. Con Plunk Lite, sigue references/plunk-lite.md §5.
+La versión está fijada en el compose (`image: ghcr.io/useplunk/plunk:0.18.0`), así que actualizar es un cambio del compose, no del env. Con Plunk Lite, sigue references/plunk-lite.md §5.
 
 1. Lee las notas de versión entre la versión actual y la nueva (https://github.com/useplunk/plunk/releases): migraciones, variables nuevas, cambios de comportamiento.
 2. Comprueba que el parche de arranque sigue aplicando. Con Docker en cualquier máquina:
@@ -53,7 +53,7 @@ La versión está fijada en el compose (`image: ghcr.io/useplunk/plunk:0.17.0`),
    docker run --rm --entrypoint cat ghcr.io/useplunk/plunk:NUEVA /usr/local/bin/docker-entrypoint-nginx.sh | grep -n 'replace_urls_in_app "landing"\|replace_urls_in_app "wiki"\|^exec pm2-runtime start /tmp/ecosystem.config.js$'
    ```
    Deben salir las tres líneas. Si el script ya no está en esa ruta, quita el bloque `entrypoint`/`command` antes de actualizar (si no, el contenedor no arrancaría).
-3. Haz una copia de Postgres (sección 5).
+3. Haz una copia de Postgres (sección 5). De la 0.17 a la 0.18 es imprescindible: su migración añade valores al enum `EmailStatus`, que no se quitan con facilidad, así que volver a la 0.17 es restaurar esa copia. La migración en sí es inmediata (medido sobre una BD 0.17.0 con datos), y su índice sobre `emails` se construye después de arrancar.
 4. Cambia la etiqueta de la imagen en el compose y despliega.
 5. Verifica: log `Plunk: arrancando nginx, api, worker, web`, `https://<API_DOMAIN>/health` da 200, el panel carga y la cuota de SES aparece en el log.
 6. Si la versión nueva necesita variables nuevas: la persona las añade en Dokploy y tú las añades a la sección `environment` del compose (si no están ahí, no llegan al contenedor).

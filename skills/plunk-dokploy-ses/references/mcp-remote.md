@@ -1,6 +1,6 @@
 # MCP de Plunk accesible desde claude.ai
 
-Para usar Plunk desde claude.ai (o cualquier cliente MCP remoto) sin tener un ordenador encendido. Probado en octubre de 2026 con @plunk/mcp 0.17.0 y con el MCP de Plunk Lite, claude.ai y Claude Code.
+Para usar Plunk desde claude.ai (o cualquier cliente MCP remoto) sin tener un ordenador encendido. Probado en octubre de 2026 con @plunk/mcp 0.17.0 y con el MCP de Plunk Lite, claude.ai y Claude Code. @plunk/mcp 0.18.0 se probó en noviembre en local, por los dos protocolos y contra una API 0.18.0, sin pasar por claude.ai.
 
 ## Índice
 1. Por qué hace falta montarlo
@@ -38,6 +38,8 @@ El commit es el que imprime `scripts/plunk_lite_latest.py` (la línea `Commit:`,
 - las herramientas `plunk_add_to_segment` y `plunk_remove_from_segment` para los segmentos estáticos;
 - en `plunk_send_campaign`, el número de contactos dados de baja que recibe una campaña TRANSACTIONAL;
 - los arreglos del MCP que Plunk aún no ha publicado.
+
+Además, el de npm ofrece lo que Plunk Lite no tiene: `delivery` en `plunk_send_email`, `plunk_reschedule_email` y `plunk_cancel_email`.
 
 Un MCP de un commit más nuevo que la imagen puede pedir rutas que esa API aún no tiene: usa el mismo commit. La primera construcción tarda unos minutos más, porque compila el MCP.
 
@@ -114,7 +116,7 @@ Con el MCP de Plunk Lite, una campaña TRANSACTIONAL también llega a los contac
 
 ## 8. Mantenimiento
 
-- **Versiones fijadas** en `server.mjs` y el Dockerfile: `@plunk/mcp@0.17.0`, `@modelcontextprotocol/server@2.4.0`, `@modelcontextprotocol/node@2.1.2` y `mcp-auth-proxy:2.10.2`.
+- **Versiones fijadas** en `server.mjs` y el Dockerfile: `@plunk/mcp@0.18.0`, `@modelcontextprotocol/server@2.4.0`, `@modelcontextprotocol/node@2.1.2` y `mcp-auth-proxy:2.10.2`.
   - Al actualizar Plunk, sube `@plunk/mcp` a la misma versión.
   - Con Plunk Lite, cada vez que cambies la imagen, regenera el compose con `--plunk-lite` y el commit nuevo, pégalo en `plunk-mcp` y despliégalo.
   - Comprueba que `@plunk/mcp` sigue exponiendo `buildServer` (export principal) y `dist/config.js` (`loadConfig`), que usa `server.mjs`.

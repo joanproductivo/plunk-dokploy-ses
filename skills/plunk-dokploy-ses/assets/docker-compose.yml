@@ -5,7 +5,7 @@
 #   - Sin container_name ni puertos publicados en el host: Traefik de Dokploy enruta por dominio
 #   - Servicios con prefijo plunk- para evitar choques de nombres DNS con otros stacks del servidor
 #   - Sin relay SMTP (puertos 465/587) ni ntfy (avisos push que nadie recibía)
-#   - Arranque sin landing, wiki ni relay SMTP para ahorrar ~100 MB (ver el servicio plunk)
+#   - Arranque sin landing, wiki ni relay SMTP para ahorrar ~135 MB (ver el servicio plunk)
 #   - Logs de cada contenedor limitados a 3 ficheros de 10 MB (Docker no los rota por defecto)
 #   - Sin MinIO: las imágenes del editor van a un S3 externo (Cloudflare R2 u otro), configurado en el env
 # Los valores ${...} vienen de la pestaña Environment de Dokploy (ver assets/env.template).
@@ -57,21 +57,21 @@ services:
       retries: 5
 
   plunk:
-    image: ghcr.io/useplunk/plunk:0.17.0
+    image: ghcr.io/useplunk/plunk:0.18.0
     restart: unless-stopped
     # Margen para que Plunk termine lo que tiene en curso al parar: con los 10 s por defecto de
     # Docker, un despliegue a mitad de una campaña cortaba envíos y lotes. Plunk Lite espera hasta
     # 30 s (pm2 kill_timeout); con la imagen oficial no estorba.
     stop_grace_period: 45s
     # Techo de memoria del contenedor, para que un proceso desbocado no tumbe el servidor ni a sus
-    # vecinos. Plunk Lite usa unos 200 MB en reposo y limita además el heap de api y worker dentro.
+    # vecinos. Plunk usa unos 250 MB en reposo; Plunk Lite limita además el heap de api y worker dentro.
     mem_limit: 2g
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-    # Arranca Plunk sin landing, wiki ni el relay SMTP para ahorrar ~100 MB.
+    # Arranca Plunk sin landing, wiki ni el relay SMTP para ahorrar ~135 MB.
     # Si una versión nueva cambia el script de arranque y el parche no aplica, arranca todo como siempre.
     # Para volver al arranque original, borra entrypoint y command.
     entrypoint: ["/bin/sh", "-c"]

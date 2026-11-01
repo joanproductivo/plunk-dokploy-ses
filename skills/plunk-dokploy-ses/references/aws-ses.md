@@ -38,6 +38,8 @@ Además, un segundo statement, `PlunkDLQ`, con las mismas condiciones y solo sob
 
 **Por qué dos configuration sets:** el que lleva OPEN hace que SES inserte el píxel invisible; el que lleva CLICK reescribe los enlaces. El segundo set, sin ambos, es lo que permite a Plunk ofrecer el selector "Email tracking" (Enabled / Disabled / Marketing only). Plunk solo muestra ese selector si la variable `SES_CONFIGURATION_SET_NO_TRACKING` existe.
 
+**Misma cuenta:** desde la 0.18, Plunk solo acepta mensajes de SNS de topics en la cuenta de AWS de sus claves de SES. La averigua con `sts:GetCallerIdentity`, que no necesita permisos, así que la política no cambia y `ses_setup` ya crea el topic en esa cuenta. Comprobado leyendo el código y con un mensaje sin firma (403), no con un evento real de SES: el envío al simulador (§5) confirma que los eventos llegan.
+
 **Orden:** la API de Plunk debe responder ya por HTTPS antes de crear la suscripción, porque SNS manda el mensaje de confirmación en el momento. Si la suscripción queda en `PendingConfirmation`, comprueba que `https://<API_DOMAIN>/health` da 200, bórrala y vuelve a ejecutar el snippet.
 
 ## 2. Ejecutar la configuración
@@ -180,7 +182,7 @@ Plunk usa la cuota que lee de SES. Antes de enviar en volumen, conviene fijar `E
 
 ## 9. Quitar el seguimiento de aperturas
 
-Gmail (proxy de imágenes), Apple Mail Privacy Protection y algunos antivirus descargan el píxel al recibir el email, y Plunk 0.17 cuenta eso como apertura (en las pruebas llegó 1–2 s después de la entrega). Está reportado en https://github.com/useplunk/plunk/issues/531. Si la persona prefiere no ver aperturas falsas, quita `OPEN` del configuration set principal y se queda con los clics, que sí son fiables:
+Desde la 0.18, Plunk no cuenta las aperturas que SES marca como automáticas (https://github.com/useplunk/plunk/issues/531), lo que cubre la descarga del píxel que hace Gmail al recibir el email. Algunos clientes y antivirus aún generan aperturas que SES no marca. Si la persona prefiere no ver ninguna apertura falsa, quita `OPEN` del configuration set principal y se queda con los clics, que sí son fiables:
 
 `sesv2:UpdateConfigurationSetEventDestination` en `plunk-configuration-set` / `plunk-sns` con `MatchingEventTypes: ["DELIVERY","CLICK","BOUNCE","COMPLAINT","REJECT"]` (mantén `Enabled: true` y el mismo `SnsDestination`). Es reversible volviendo a añadir `OPEN`. Pide confirmación antes: cambia lo que mide la herramienta.
 

@@ -1,6 +1,6 @@
 # Usar Plunk: API, webs, eventos y ajustes
 
-Comprobado contra el código de Plunk 0.17.0. En la API, las rutas van sobre `https://<API_DOMAIN>`.
+Comprobado contra el código de Plunk 0.17.0 y revisado con los cambios de la 0.18.0. En la API, las rutas van sobre `https://<API_DOMAIN>`.
 
 ## Índice
 1. Claves
@@ -70,6 +70,8 @@ Si estos emails llevan enlaces de acceso o códigos, pon el tracking en **Market
 
 ## 3. Eventos y workflows (`/v1/track`)
 
+Desde la 0.18, la oficial admite `delivery` en `/v1/send`: `delivery.at` programa el envío (hasta 30 días) y `delivery.throttle` lo limita por destinatario (una ventana como `"24h"`). Plunk Lite no lo tiene (plunk-lite.md §2).
+
 Los eventos **no** van en `/v1/send`; son otra llamada:
 
 ```
@@ -103,9 +105,9 @@ El selector solo aparece si existe `SES_CONFIGURATION_SET_NO_TRACKING` en el env
 
 **Clics automáticos:** los antivirus de correo pulsan enlaces, así que un clic tampoco prueba que haya una persona. Con Plunk Lite, los que SES marca como automáticos no cuentan ni lanzan workflows; los demás sí, y la oficial los cuenta todos. Un workflow con consecuencias (dar acceso, cobrar) no debería depender solo de un clic.
 
-**Aperturas falsas:** Gmail, Apple Mail y algunos antivirus descargan el píxel al recibir el email, y Plunk 0.17 lo cuenta como apertura (llega 1–2 s después de la entrega; las aperturas posteriores sí suelen ser reales). Herramientas como Flodesk o Mailchimp filtran esas aperturas; Plunk aún no (https://github.com/useplunk/plunk/issues/531). Opciones: tomar las aperturas como orientativas y fiarse de los clics, o quitar `OPEN` del configuration set (references/aws-ses.md, sección 9).
+**Aperturas falsas:** Gmail y algunos antivirus descargan el píxel al recibir el email. Desde la 0.18, Plunk no cuenta las aperturas que SES marca como automáticas (`isBotEvent`: `Likely`), ni lanza `email.open` con ellas; con Gmail, esa marca salió en cada descarga automática (https://github.com/useplunk/plunk/issues/531). Las que SES no marca siguen contando, así que algunos clientes y pasarelas de correo aún generan aperturas falsas. Opciones: tomar las aperturas como orientativas y fiarse de los clics, o quitar `OPEN` del configuration set (references/aws-ses.md, sección 9).
 
-**Porcentajes con Marketing only o Disabled:** Plunk 0.17 no tiene en cuenta el modo de seguimiento al calcular aperturas y clics. El dashboard divide entre todos los emails del proyecto (también transaccionales, del simulador, entrantes y no enviados), y Analytics, en la vista de todos los streams, entre todos los enviados. Los transaccionales sin seguimiento bajan el porcentaje: con 1 transaccional y 1 campaña abierta sale 50 % en lugar de 100 %. Está reportado en https://github.com/useplunk/plunk/issues/533. Los datos fiables son la página de cada campaña y Analytics filtrado por stream (pulsa la fila en la tabla "By stream"); la fila Transactional marca 0 % porque no se mide. Avísalo a la persona si usa Marketing only.
+**Porcentajes con Marketing only o Disabled:** la oficial, también la 0.18, no tiene en cuenta el modo de seguimiento al calcular aperturas y clics. El dashboard divide entre todos los emails del proyecto (también transaccionales, del simulador, entrantes y no enviados), y Analytics, en la vista de todos los streams, entre todos los enviados. Los transaccionales sin seguimiento bajan el porcentaje: con 1 transaccional y 1 campaña abierta sale 50 % en lugar de 100 %. Está reportado en https://github.com/useplunk/plunk/issues/533. Los datos fiables son la página de cada campaña y Analytics filtrado por stream (pulsa la fila en la tabla "By stream"); la fila Transactional marca 0 % porque no se mide. Avísalo a la persona si usa Marketing only.
 
 ## 5. Emails de la plataforma y límite de la API
 

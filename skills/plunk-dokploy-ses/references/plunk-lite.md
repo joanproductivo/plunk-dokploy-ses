@@ -12,17 +12,17 @@
 
 [Plunk Lite](https://github.com/joanproductivo/plunk-lite) es un fork **no oficial** de Plunk pensado solo para self-hosting. Lo mantiene una persona, no el equipo de Plunk. Parte de una versión de Plunk (hoy, la 0.17.0, con lo elegido de la 0.18.0) y le añade arreglos que aún no están en la oficial, además de una imagen más pequeña.
 
-La imagen se publica en `ghcr.io/joanproductivo/plunk-lite`, es pública y tiene la misma licencia que Plunk (AGPL-3.0). Usa la misma base de datos y las mismas variables que la oficial: se puede pasar de una a otra cambiando la imagen del compose.
+La imagen se publica en `ghcr.io/joanproductivo/plunk-lite`, es pública y tiene la misma licencia que Plunk (AGPL-3.0). Usa la misma base de datos y las mismas variables que la oficial: se puede pasar de una a otra cambiando la imagen del compose, con la excepción de los emails programados (§4).
 
 ## 2. En qué se diferencia de la imagen oficial
 
 | | Oficial (con el arranque recortado del compose) | Plunk Lite |
 |---|---|---|
-| Node.js | 20 (sin parches de seguridad desde abril de 2026) | 24 |
+| Node.js | 24.22.1 | 24 |
 | Procesos | nginx, api, worker y el panel con su propio servidor Node | nginx, api y worker; nginx sirve el panel como ficheros estáticos |
 | Landing, wiki, relay SMTP | Van en la imagen; el compose los apaga al arrancar | No van en la imagen |
-| Tamaño de la imagen | ~1,7 GB | ~0,9 GB |
-| Memoria del contenedor | ~190–230 MB | ~190 MB recién arrancado (Node 24 gasta algo más por proceso, pero no hay proceso del panel) |
+| Tamaño de la imagen (sin comprimir) | ~1,6 GB | ~0,7 GB |
+| Memoria del contenedor (una medición en local, a los ~3 min) | ~245 MB | ~270 MB: no hay proceso del panel, pero el worker gasta más |
 | Analítica de Plunk en el panel | Sí (carga un script de terceros en cada visita) | No |
 
 Además lleva arreglos de fallos que la oficial aún no tiene, como las tasas del dashboard correctas. También lleva los arreglos de seguridad y de workflows de la 0.18.0. El detalle está en los commits del repositorio.
@@ -104,8 +104,7 @@ También es más segura al enviar en volumen. Revisada en octubre de 2026 antes 
 ## 3. Cuándo recomendarla y cuándo no
 
 **Recomiéndala** si la persona:
-- quiere gastar menos memoria y disco en un servidor pequeño;
-- prefiere un Node.js con soporte de seguridad;
+- quiere gastar menos disco en un servidor pequeño;
 - no necesita el relay SMTP de Plunk (enviar desde otro programa por SMTP en vez de por la API).
 
 **No la recomiendes** si:
@@ -132,6 +131,12 @@ Sigue la Fase 1 de SKILL.md con estos cambios en `assets/docker-compose.yml`, an
 3. Borra el bloque `entrypoint`/`command` del servicio `plunk`, con sus tres líneas de comentario. La imagen ya arranca solo lo necesario. Si se deja, no rompe nada, pero sobra.
 
 El resto no cambia: el env (con las variables `S3_*` del bucket), los dominios, SES y el DNS.
+
+**Si la instalación ya corre con la oficial 0.18 o más.** Haz antes una copia de Postgres y comprueba que no quedan emails programados ni cancelados:
+```sql
+SELECT status, count(*) FROM emails WHERE status IN ('SCHEDULED', 'CANCELLED') GROUP BY 1;
+```
+Sin ninguno, el cambio funciona: se aplican las migraciones de Plunk Lite y los datos siguen ahí (medido en local, también la vuelta a la oficial). Si hay alguno, no cambies todavía: Plunk Lite no envía los programados, y sus lecturas de esa tabla que incluyen `status` fallan con `Value 'SCHEDULED' not found in enum 'EmailStatus'`. Cancelarlos no basta, porque `CANCELLED` tampoco lo conoce. Deja que salgan, y decide con la persona qué hacer con esas filas antes de seguir, porque borrarlas pierde su historial.
 
 **Verificación** (sustituye a la de la Fase 1):
 - El contenedor `plunk` queda healthy.
@@ -190,6 +195,6 @@ Antes, avisa de lo que se pierde si se han usado las funciones propias (sección
 Los datos no se borran: quedan en las tablas `plunk_lite_*` y vuelven a usarse si se regresa a Plunk Lite.
 
 1. Haz una copia de Postgres.
-2. Pon la imagen oficial (`ghcr.io/useplunk/plunk:<versión>`) en una versión igual o más nueva que la base de Plunk Lite. Si eliges una más antigua, la base de datos podría tener migraciones que esa versión no conoce. Desde la 0.18.0, la oficial aplica una migración que Plunk Lite no lleva, con valores nuevos en un enum que no se quitan con facilidad. Volver después a Plunk Lite no está medido: cuenta con restaurar la copia del paso 1.
+2. Pon la imagen oficial (`ghcr.io/useplunk/plunk:<versión>`) en una versión igual o más nueva que la base de Plunk Lite. Si eliges una más antigua, la base de datos podría tener migraciones que esa versión no conoce. Desde la 0.18.0, la oficial aplica una migración que Plunk Lite no lleva, con valores nuevos en un enum que no se quitan con facilidad. Volver después a Plunk Lite funciona (medido en local, §4).
 3. Vuelve a poner el bloque `entrypoint`/`command` de `assets/docker-compose.yml`, o el contenedor arrancará también landing, wiki y SMTP.
 4. Despliega y verifica como en la Fase 1 de SKILL.md.

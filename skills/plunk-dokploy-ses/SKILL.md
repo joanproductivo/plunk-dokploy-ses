@@ -5,7 +5,7 @@ description: Despliega y configura Plunk self-hosted (useplunk/plunk, email mark
 
 # Plunk en Dokploy con AWS SES
 
-Guía para montar una instalación privada de Plunk que envía a través de AWS SES, desplegada como compose en Dokploy. Sale de dos instalaciones reales (Plunk 0.17.0, octubre de 2026, DNS en Cloudflare, SES en eu-north-1). Funciona igual con otras regiones y otros proveedores de DNS.
+Guía para montar una instalación privada de Plunk que envía a través de AWS SES, desplegada como compose en Dokploy. Sale de dos instalaciones reales (DNS en Cloudflare, SES en eu-north-1), montadas con Plunk 0.17.0 en octubre de 2026. La plantilla usa la 0.18.0, probada en local en noviembre. Funciona igual con otras regiones y otros proveedores de DNS.
 
 Al terminar, la persona tiene:
 - un panel en `https://envio.<dominio>`;
@@ -46,7 +46,7 @@ Pregunta solo lo que no sepas ya:
 4. **Región de SES.** La de la cuenta de AWS. Se usa la misma en todo.
 5. **Buzón para respuestas.** Plunk no recibe correo. Comprueba que la dirección de respuesta tiene un buzón que funcione (using-plunk.md §7).
 6. **Dónde guardar las imágenes del editor.** Plunk las sube a un almacenamiento S3 y las enlaza en los emails. La plantilla no lleva MinIO: usa un bucket externo, por defecto Cloudflare R2 (10 GB gratis, sin coste de salida, y no gasta memoria del servidor). La persona crea el bucket, conecta `envio-files.<dominio>` como dominio propio del bucket (en R2: Settings → Custom Domains; hace público el bucket) y crea un token con lectura y escritura solo en ese bucket. Apunta el endpoint (`https://<account_id>.r2.cloudflarestorage.com`) y el nombre del bucket; las claves del token se pegan en Dokploy en la Fase 2. Si no quiere un servicio externo, ver operations.md §6 (MinIO en el servidor o sin subidas).
-7. **Imagen oficial o Plunk Lite.** Por defecto se usa la imagen oficial de Plunk con el arranque recortado del compose. Plunk Lite es un fork ligero y no oficial, con Node 24, la mitad de tamaño, arreglos que la oficial aún no tiene y funciones propias (editor de emails ampliado, segmentos estáticos con eventos, avisos de fallos, doble opt-in), pero sin relay SMTP. Explícalo en una frase y pregúntalo solo si a la persona le importan la memoria, la seguridad de Node, esos arreglos o esas funciones (references/plunk-lite.md §2-3).
+7. **Imagen oficial o Plunk Lite.** Por defecto se usa la imagen oficial de Plunk con el arranque recortado del compose. Plunk Lite es un fork ligero y no oficial, con menos de la mitad de tamaño, arreglos que la oficial aún no tiene y funciones propias (editor de emails ampliado, segmentos estáticos con eventos, avisos de fallos, doble opt-in), pero sin relay SMTP. Explícalo en una frase y pregúntalo solo si a la persona le importan el disco, esos arreglos o esas funciones (references/plunk-lite.md §2-3).
 
 ## Fase 1: Desplegar en Dokploy
 
@@ -154,7 +154,7 @@ Propón estos ajustes y explica cada uno en una frase. Los cambios de env los ha
 - **`AUTO_PROJECT_DISABLE=true`** (ya viene así en el env generado). Con Plunk Lite frena primero la campaña o el workflow que rebota, y solo desactiva el proyecto como último recurso (`PLUNK_LITE_DISABLE_*_PERCENT`, ver `references/aws-ses.md`); con la oficial, el crítico desactiva el proyecto. Si la persona lo quiere apagar, que sepa que entonces solo recibe avisos. Recomienda también las alarmas de CloudWatch: `scripts/ses_alarms.snippet.py` (references/aws-ses.md). Los valores de entorno, siempre con punto decimal (`0.4`).
 - **No desplegar durante una campaña.** El compose da 45 s para terminar lo que está en curso, pero un despliegue en mitad de un envío grande sigue siendo un riesgo innecesario.
 - **Google Postmaster Tools.** Propón registrar el dominio raíz y los de envío, para ver la reputación en Gmail (dns.md §9). Sin volumen no enseña datos.
-- **Aperturas.** Avisa de que Gmail, Apple y los antivirus generan aperturas falsas. Los clics son más fiables, pero los antivirus también pulsan enlaces: Plunk Lite solo descarta los que SES marca como automáticos (using-plunk.md §4).
+- **Aperturas.** Avisa de que algunos clientes y antivirus generan aperturas falsas; Plunk solo descarta las que SES marca como automáticas. Los clics son más fiables, pero los antivirus también pulsan enlaces: Plunk Lite solo descarta los que SES marca como automáticos (using-plunk.md §4).
 
 ## Después: integrar y mantener
 
