@@ -1,4 +1,4 @@
-// Sirve el MCP oficial de Plunk (@plunk/mcp) por HTTP para ponerlo detrás de mcp-auth-proxy.
+// Sirve el MCP de Plunk (paquete @plunk/mcp) por HTTP para ponerlo detrás de mcp-auth-proxy.
 // Solo escucha en la red interna del compose: el login lo exige el proxy de delante.
 //
 // Los clientes de la era 2025 van por sesiones con estado: así el servidor puede preguntar

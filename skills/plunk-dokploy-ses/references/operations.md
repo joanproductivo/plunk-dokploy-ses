@@ -2,7 +2,7 @@
 
 ## Índice
 1. Qué corre y cuánto ocupa
-2. Arranque recortado
+2. Qué no lleva la imagen
 3. Actualizar Plunk
 4. Variables de entorno, reiniciar y desplegar
 5. Copias de seguridad
@@ -14,49 +14,34 @@
 
 ## 1. Qué corre y cuánto ocupa
 
-Medido con Plunk 0.18.0 en local (arm64, a los ~3 minutos de arrancar, sin envíos ni claves de AWS reales); en un servidor puede variar. El contenedor `plunk` lleva varios programas Node.js gestionados por PM2:
+Medido con `sha-5892b47` en local (arm64, a los ~3 minutos de arrancar, sin envíos ni claves de AWS reales, 2026-11-01). En un servidor puede variar: con una versión anterior, en reposo rondaba los 200 MB. El contenedor `plunk` lleva tres procesos gestionados por PM2:
 
 | Proceso | Qué hace | Memoria propia |
 |---|---|---|
-| api | API pública y webhooks de SNS | ~84 MB |
-| worker | Colas: envíos, campañas, workflows | ~75 MB |
-| web | El panel | ~57 MB |
-| pm2 + nginx | Supervisor y enrutado por dominio | ~25 MB |
-| wiki, landing, smtp | Docs, web promocional, relay SMTP | ~145 MB (quitados por el arranque recortado) |
+| api | API pública y webhooks de SNS | ~114 MB |
+| worker | Colas: envíos, campañas, workflows | ~97 MB |
+| pm2 + nginx | Supervisor, enrutado por dominio y el panel como ficheros estáticos | ~45 MB |
 
-Contenedor: ~380 MB con todo, ~245 MB recortado (la 0.17.0, medida igual, ~200 MB recortado). Además: Postgres ~35–100 MB y Redis ~10 MB. Una instalación completa recortada ronda los 350 MB (MinIO, si se monta, suma ~90 MB).
+Contenedor: ~290 MB. Además: Postgres ~65 MB y Redis ~18 MB. Una instalación completa ronda los 370 MB (MinIO, si se monta, suma ~90 MB). La imagen ocupa ~0,7 GB sin comprimir.
 
 Límites que pone la plantilla, para enviar en volumen sin tumbar el servidor:
 
-- **Memoria del contenedor `plunk`: 2 GB** (`mem_limit`). Un proceso desbocado, como una importación enorme, no se queda con la memoria de las demás aplicaciones del servidor. Plunk Lite limita además el heap de cada proceso (api 768 MB, worker 1 GB), y pm2 los reinicia de forma ordenada antes de llegar ahí.
+- **Memoria del contenedor `plunk`: 2 GB** (`mem_limit`). Un proceso desbocado, como una importación enorme, no se queda con la memoria de las demás aplicaciones del servidor. La imagen limita además el heap de cada proceso (api 768 MB, worker 1 GB), y pm2 los reinicia de forma ordenada antes de llegar ahí.
 - **Postgres y Redis no llevan límite, a propósito.** Si a Postgres le falta memoria, reinicia todas sus conexiones a la vez. Redis guarda las colas de envío con `noeviction`: si le falta memoria, pierde trabajos.
 - **Conexiones a Postgres: 15 por proceso** (`?connection_limit=15&pool_timeout=20` en `DATABASE_URL`). Por defecto, Prisma abre 2 por CPU más 1 (9 con 4 CPU) y espera 10 s. Durante una campaña, el worker lleva unas 30 tareas a la vez y se quedaba corto. En total son unas 30 conexiones, muy por debajo de las 100 de Postgres. Las migraciones usan `DIRECT_DATABASE_URL`, sin límite.
-- **Redis 7 o más.** El contador de intentos de login de Plunk Lite usa `EXPIRE … NX`. La plantilla ya usa `redis:7-alpine`.
+- **Redis 7 o más.** El contador de intentos de login usa `EXPIRE … NX`. La plantilla ya usa `redis:7-alpine`.
 
 Disco: Docker no limita por defecto el log de cada contenedor (el healthcheck ya escribe ~1 MB al día y cada email añade varias líneas). La plantilla lo deja en 3 ficheros de 10 MB por servicio (como mucho ~120 MB por instalación). Para comprobarlo, `HostConfig.LogConfig.Config` del contenedor (docker inspect, o `docker-getConfig` en el MCP de Dokploy) debe mostrar `max-size` y `max-file`; si sale vacío, el compose desplegado no lleva el bloque `logging`. Plunk guarda los eventos en Postgres, así que rotar el log no pierde nada importante.
 
-## 2. Arranque recortado
+## 2. Qué no lleva la imagen
 
-El compose sustituye `entrypoint`/`command` del servicio `plunk`: copia el script original `/usr/local/bin/docker-entrypoint-nginx.sh`, quita con `sed` la preparación de landing y wiki, y antes de `exec pm2-runtime start /tmp/ecosystem.config.js` ejecuta un filtro que elimina `landing`, `wiki` y `smtp` de la configuración de PM2.
-
-- Log esperado: `Plunk: arrancando nginx, api, worker, web`.
-- Si una versión nueva cambia el script y el parche no encaja, el log dice `AVISO: el parche de arranque no aplica a esta versión de Plunk; arrancando todos los servicios` y Plunk arranca completo (funciona, solo gasta más memoria).
-- Para volver al arranque original: borra `entrypoint` y `command` del servicio `plunk` y despliega.
+La imagen no lleva landing, wiki ni relay SMTP, y nginx sirve el panel como ficheros estáticos, así que pm2 arranca solo nginx, api y worker. El compose no sustituye `entrypoint` ni `command`. Si Plunk no arranca, los fallos de nginx y del reemplazo de URLs paran el contenedor a propósito: mira el principio de su log.
 
 ## 3. Actualizar Plunk
 
-La versión está fijada en el compose (`image: ghcr.io/useplunk/plunk:0.18.0`), así que actualizar es un cambio del compose, no del env. Con Plunk Lite, sigue references/plunk-lite.md §5.
+La versión está fijada en el compose (`image: ghcr.io/joanproductivo/plunk-lite:sha-<commit>`), así que actualizar es un cambio del compose, no del env. Sigue references/plunk-lite.md §4.
 
-1. Lee las notas de versión entre la versión actual y la nueva (https://github.com/useplunk/plunk/releases): migraciones, variables nuevas, cambios de comportamiento.
-2. Comprueba que el parche de arranque sigue aplicando. Con Docker en cualquier máquina:
-   ```bash
-   docker run --rm --entrypoint cat ghcr.io/useplunk/plunk:NUEVA /usr/local/bin/docker-entrypoint-nginx.sh | grep -n 'replace_urls_in_app "landing"\|replace_urls_in_app "wiki"\|^exec pm2-runtime start /tmp/ecosystem.config.js$'
-   ```
-   Deben salir las tres líneas. Si el script ya no está en esa ruta, quita el bloque `entrypoint`/`command` antes de actualizar (si no, el contenedor no arrancaría).
-3. Haz una copia de Postgres (sección 5). De la 0.17 a la 0.18 es imprescindible: su migración añade valores al enum `EmailStatus`, que no se quitan con facilidad, así que volver a la 0.17 es restaurar esa copia. La migración en sí es inmediata (medido sobre una BD 0.17.0 con datos), y su índice sobre `emails` se construye después de arrancar.
-4. Cambia la etiqueta de la imagen en el compose y despliega.
-5. Verifica: log `Plunk: arrancando nginx, api, worker, web`, `https://<API_DOMAIN>/health` da 200, el panel carga y la cuota de SES aparece en el log.
-6. Si la versión nueva necesita variables nuevas: la persona las añade en Dokploy y tú las añades a la sección `environment` del compose (si no están ahí, no llegan al contenedor).
+Si la versión nueva necesita variables nuevas, la persona las añade en Dokploy y tú las añades a la sección `environment` del compose (si no están ahí, no llegan al contenedor).
 
 ## 4. Variables de entorno, reiniciar y desplegar
 

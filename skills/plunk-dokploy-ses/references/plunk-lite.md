@@ -1,33 +1,25 @@
-# Plunk Lite: la imagen ligera (opcional)
+# Plunk Lite: qué lleva, actualizarla y volver a la oficial
 
 ## Índice
 1. Qué es
-2. En qué se diferencia de la imagen oficial
-3. Cuándo recomendarla y cuándo no
-4. Desplegar con Plunk Lite
-5. Actualizar
-6. Volver a la imagen oficial
+2. Qué lleva
+3. Fijar la versión y probarla
+4. Actualizar
+5. Volver a la imagen oficial
 
 ## 1. Qué es
 
-[Plunk Lite](https://github.com/joanproductivo/plunk-lite) es un fork **no oficial** de Plunk pensado solo para self-hosting. Lo mantiene una persona, no el equipo de Plunk. Parte de una versión de Plunk (hoy, la 0.17.0, con lo elegido de la 0.18.0) y le añade arreglos que aún no están en la oficial, además de una imagen más pequeña.
+[Plunk Lite](https://github.com/joanproductivo/plunk-lite) es un fork **no oficial** de Plunk pensado solo para self-hosting. Lo mantiene una persona, no el equipo de Plunk. Parte de una versión de Plunk (hoy, la 0.17.0, con lo elegido de la 0.18.0) y le añade arreglos que aún no están en la oficial, además de una imagen más pequeña. **No lleva relay SMTP:** se envía por la API y el panel, no desde otro programa por SMTP.
 
-La imagen se publica en `ghcr.io/joanproductivo/plunk-lite`, es pública y tiene la misma licencia que Plunk (AGPL-3.0). Usa la misma base de datos y las mismas variables que la oficial: se puede pasar de una a otra cambiando la imagen del compose, con la excepción de los emails programados (§4).
+La imagen se publica en `ghcr.io/joanproductivo/plunk-lite`, es pública y tiene la misma licencia que Plunk (AGPL-3.0). Usa la misma base de datos y las mismas variables que la oficial: se puede pasar de una a otra cambiando la imagen del compose, con la excepción de los emails programados (§3).
 
-## 2. En qué se diferencia de la imagen oficial
+## 2. Qué lleva
 
-| | Oficial (con el arranque recortado del compose) | Plunk Lite |
-|---|---|---|
-| Node.js | 24.22.1 | 24 |
-| Procesos | nginx, api, worker y el panel con su propio servidor Node | nginx, api y worker; nginx sirve el panel como ficheros estáticos |
-| Landing, wiki, relay SMTP | Van en la imagen; el compose los apaga al arrancar | No van en la imagen |
-| Tamaño de la imagen (sin comprimir) | ~1,6 GB | ~0,7 GB |
-| Memoria del contenedor (una medición en local, a los ~3 min) | ~245 MB | ~270 MB: no hay proceso del panel, pero el worker gasta más |
-| Analítica de Plunk en el panel | Sí (carga un script de terceros en cada visita) | No |
+Frente a la imagen oficial, no lleva landing, wiki ni relay SMTP, nginx sirve el panel como ficheros estáticos, no carga la analítica de Plunk y ocupa ~0,7 GB sin comprimir frente a ~1,6 GB (0.18.0, medido el 2026-11-01).
 
 Además lleva arreglos de fallos que la oficial aún no tiene, como las tasas del dashboard correctas. También lleva los arreglos de seguridad y de workflows de la 0.18.0. El detalle está en los commits del repositorio.
 
-**Lo que tiene la oficial 0.18.0 y Plunk Lite no:** programar envíos (`delivery.at`) y limitar repeticiones (`delivery.throttle`, también al entrar en un workflow), `List-Unsubscribe` con enlace propio en envíos headless, y la lista de campos de contacto servida desde Redis, pensada para millones de contactos.
+**Lo que tiene la oficial 0.18.0 y Plunk Lite no**, porque elige lo que coge de cada versión: programar envíos (`delivery.at`) y limitar repeticiones (`delivery.throttle`, también al entrar en un workflow), `List-Unsubscribe` con enlace propio en envíos headless, y la lista de campos de contacto servida desde Redis, pensada para millones de contactos.
 
 Y añade funciones que la oficial no tiene:
 
@@ -52,7 +44,7 @@ Y añade funciones que la oficial no tiene:
   - **El secreto no se puede leer:** `GET` en la misma ruta solo dice si hay uno, y `DELETE` lo quita. Duplicar el workflow no lo copia: el duplicado sale sin firma.
   - **Una respuesta que no sea 2xx** hace fallar el paso y avisa. No se reintenta, así que el receptor debe responder 2xx también a lo repetido o ya hecho.
 
-Estas funciones guardan sus datos en nueve tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 6).
+Estas funciones guardan sus datos en nueve tablas propias (`plunk_lite_*`). Las tablas de Plunk no cambian, así que la imagen oficial arranca sobre la misma base de datos; simplemente ignora esas tablas (sección 5).
 
 También es más segura al enviar en volumen. Revisada en octubre de 2026 antes de campañas de miles de emails:
 
@@ -101,49 +93,25 @@ También es más segura al enviar en volumen. Revisada en octubre de 2026 antes 
   - el rebote o la queja recuperados salen marcados en la actividad del contacto, y cada proyecto ve en un aviso lo que se recuperó para él;
   - necesita el statement `PlunkDLQ` que añade `ses_setup` (aws-ses.md §1). Sin él, todos los paneles avisan «AWS dead-letter queue not readable».
 
-## 3. Cuándo recomendarla y cuándo no
+## 3. Fijar la versión y probarla
 
-**Recomiéndala** si la persona:
-- quiere gastar menos disco en un servidor pequeño;
-- no necesita el relay SMTP de Plunk (enviar desde otro programa por SMTP en vez de por la API).
-
-**No la recomiendes** si:
-- necesita el relay SMTP: Plunk Lite no lo lleva;
-- quiere solo software del proyecto oficial o soporte del equipo de Plunk;
-- necesita algo de una versión de Plunk que Plunk Lite no ha incorporado, como programar envíos o el throttling de la 0.18.0. Plunk Lite elige lo que coge de cada versión, así que no todo llega.
-
-Explica las dos opciones en una frase cada una y deja elegir a la persona. Si duda, la oficial con el arranque recortado es la opción por defecto.
-
-## 4. Desplegar con Plunk Lite
-
-Sigue la Fase 1 de SKILL.md con estos cambios en `assets/docker-compose.yml`, antes de crear el compose en Dokploy:
+La Fase 1 de SKILL.md usa `assets/docker-compose.yml`, que ya lleva Plunk Lite. Antes de crear el compose en Dokploy:
 
 1. Averigua cuál es hoy la última Plunk Lite:
    ```bash
    python3 scripts/plunk_lite_latest.py
    ```
    Imprime la etiqueta para el compose (`ghcr.io/joanproductivo/plunk-lite:sha-<commit>`), el commit y la fecha de compilación. No necesita Docker ni credenciales. Sin Python, la misma información está en la página del paquete: https://github.com/joanproductivo/plunk-lite/pkgs/container/plunk-lite
-2. Pon esa etiqueta en la imagen del servicio `plunk`:
+2. Si es más nueva que la de la plantilla, ponla en la imagen del servicio `plunk`:
    ```yaml
    image: ghcr.io/joanproductivo/plunk-lite:sha-<commit>
    ```
    Plunk Lite publica cada versión como `sha-<commit>` y, además, la más reciente como `latest` (sale de la rama `plunk-lite` del repositorio). En el compose usa siempre la `sha-<commit>`, no `latest`: con `latest`, cualquier despliegue o reinicio del servidor podría cambiar de versión sin que nadie lo decida y sin copia previa de la base de datos.
-3. Borra el bloque `entrypoint`/`command` del servicio `plunk`, con sus tres líneas de comentario. La imagen ya arranca solo lo necesario. Si se deja, no rompe nada, pero sobra.
-
-El resto no cambia: el env (con las variables `S3_*` del bucket), los dominios, SES y el DNS.
-
-**Si la instalación ya corre con la oficial 0.18 o más.** Haz antes una copia de Postgres y comprueba que no quedan emails programados ni cancelados:
+**Si la instalación ya corre con la oficial 0.18 o más**, también se pasa cambiando la imagen, y quitando el bloque `entrypoint`/`command` si lo lleva. Haz antes una copia de Postgres y comprueba que no quedan emails programados ni cancelados:
 ```sql
 SELECT status, count(*) FROM emails WHERE status IN ('SCHEDULED', 'CANCELLED') GROUP BY 1;
 ```
 Sin ninguno, el cambio funciona: se aplican las migraciones de Plunk Lite y los datos siguen ahí (medido en local, también la vuelta a la oficial). Si hay alguno, no cambies todavía: Plunk Lite no envía los programados, y sus lecturas de esa tabla que incluyen `status` fallan con `Value 'SCHEDULED' not found in enum 'EmailStatus'`. Cancelarlos no basta, porque `CANCELLED` tampoco lo conoce. Deja que salgan, y decide con la persona qué hacer con esas filas antes de seguir, porque borrarlas pierde su historial.
-
-**Verificación** (sustituye a la de la Fase 1):
-- El contenedor `plunk` queda healthy.
-- En el log no aparece `Plunk: arrancando…`. En su lugar, pm2 arranca exactamente tres procesos: `App [nginx:0] online`, `App [api:1] online` y `App [worker:2] online`.
-- En el log aparecen `nginx: configuration file /etc/nginx/nginx.conf test is successful` y `URL replacement complete for web`. Si la configuración de nginx o el reemplazo de URLs fallan, el contenedor se para a propósito, en vez de quedarse a medias.
-- `https://envio-api.<dominio>/health` responde 200 y `https://envio.<dominio>` muestra el login.
-- En el log, `Dead-letter queue worker started`.
 
 **Probar el vaciado de la DLQ** (cuando ya estén hechas la Fase 2 y la Fase 3, con `ses_setup`, la suscripción confirmada y el dominio de envío verificado; mejor también con las alarmas de `ses_alarms` y `PANEL=si`). Comprueba de punta a punta que un rebote que SNS no consiguió entregar no se pierde. Con el permiso de la persona:
 1. Desde Plunk, crea el contacto suscrito `success@simulator.amazonses.com`, con un dato que lo marque como prueba (`plunk_create_contact`, o `POST /contacts`), y envíale un email desde el dominio de envío (`plunk_send_email`, o `/v1/send`). Apunta el id del email que devuelve el envío y el del proyecto. Se usa `success@` y no `bounce@`: `bounce@` manda el rebote en vivo, y el de la DLQ sería una copia ya registrada.
@@ -165,17 +133,17 @@ Si en el paso 3 sale `[DLQ] Not allowed`, falta el statement `PlunkDLQ`: vuelve 
 4. Envíale otro email: debe salir `Delivery confirmed` en el log, llegar al buzón y no volver a suprimirse.
 5. Borra el contacto y comprueba que el alias no sigue en la lista de SES, también si la prueba se corta a medias.
 
-## 5. Actualizar
+## 4. Actualizar
 
-1. Ejecuta `python3 scripts/plunk_lite_latest.py` (sección 4). Si la etiqueta coincide con la del compose, ya está al día. Si no, lee en el repositorio qué cambió entre los dos commits: `https://github.com/joanproductivo/plunk-lite/compare/<commit instalado>...<commit nuevo>`.
+1. Ejecuta `python3 scripts/plunk_lite_latest.py` (sección 3). Si la etiqueta coincide con la del compose, ya está al día. Si no, lee en el repositorio qué cambió entre los dos commits: `https://github.com/joanproductivo/plunk-lite/compare/<commit instalado>...<commit nuevo>`.
 2. Haz una copia de Postgres (operations.md §5).
 3. Si la política de IAM no tiene aún `ses:GetAccount` o `ses:DeleteSuppressedDestination` (`ses_check` lo muestra en `iam.missing_actions`) o el statement `PlunkDLQ` con que Plunk Lite vacía la DLQ (`iam.missing_dlq_actions`), ejecuta `ses_setup` otra vez antes de desplegar. Sin `PlunkDLQ`, todos los paneles avisan «AWS dead-letter queue not readable» y la DLQ no se vacía.
 4. Cambia la etiqueta de la imagen en el compose y despliega. Si usas el MCP remoto, regenera su compose con el commit nuevo y despliégalo también (mcp-remote.md §8). Si cambian también los `command` de Postgres o Redis (como en la versión con el lote E4), Docker los recrea y la instalación se corta alrededor de un minuto: despliega fuera de una campaña.
-5. Verifica como en la sección 4. Si algo falla, vuelve a la etiqueta anterior con el mismo compose.
+5. Verifica como en la Fase 1 de SKILL.md. Si algo falla, vuelve a la etiqueta anterior con el mismo compose.
 
-## 6. Volver a la imagen oficial
+## 5. Volver a la imagen oficial
 
-Antes, avisa de lo que se pierde si se han usado las funciones propias (sección 2):
+La skill no mantiene la oficial: investiga antes los cambios de la versión que se vaya a poner (SKILL.md, «Si alguien pide la imagen oficial»). Avisa de lo que se pierde si se han usado las funciones propias (sección 2):
 
 - **Emails hechos con el editor de Plunk Lite.** La oficial ignora la marca, el preheader y los pies propios. El botón, el divisor, el espaciador, los vídeos y las cajas con fondo pueden verse peor, sobre todo en Outlook, y el editor oficial abre como HTML los emails con cajas. Revisa las plantillas y las campañas que se vayan a reutilizar.
 - **Workflows con segmentos estáticos.** En la oficial, los segmentos estáticos dejan de lanzar sus eventos de entrada y salida, así que los workflows que arrancan con ellos se quedan parados. Además, un paso «Update contact» que solo cambia segmentos hace fallar la ejecución, y una condición de pertenencia a segmento va siempre por «no».
@@ -188,13 +156,13 @@ Antes, avisa de lo que se pierde si se han usado las funciones propias (sección
   - Un `/v1/track` con la clave secreta da 401: el formulario que la use tiene que pasar a la `pk_`, o a `POST /contacts` y `POST /events/track`.
   - El campo `segments` se ignora sin error: los contactos no entran en esos segmentos.
 - **DLQ de eventos de SES.** Deja de vaciarse sola: hay que reenviar a mano al webhook lo que quede (aws-ses.md §10), y la alarma `ses-eventos-dlq` se queda en ALARM hasta entonces. El statement `PlunkDLQ` puede quedarse.
-- **MCP remoto.** Vuelve al de npm: regenera su compose sin `--plunk-lite` (mcp-remote.md §2). El de Plunk Lite pide rutas que la oficial no tiene.
+- **MCP remoto.** Vuelve al de npm: regenera su compose con `--npm <versión>` (mcp-remote.md §2). El de Plunk Lite pide rutas que la oficial no tiene.
 - **Trabajos en bloque.** Antes de cambiar de imagen, comprueba que la cola `bulk-contact-actions` de Redis no tiene trabajos pendientes o por reintentar con el filtro «Suppressed», o vacíala: la oficial, y las imágenes de Plunk Lite anteriores a ese filtro, no lo conocen y seleccionarían **todos los contactos** del proyecto, también en un borrado.
 - **Lista de supresión propia.** La oficial no la conoce: una importación o una llamada a `/v1/track` puede volver a suscribir a quien rebotó o se quejó. La supresión de la cuenta de SES sigue bloqueando esos envíos, pero cuentan como intentos. Antes de importar contactos, quita esas direcciones del CSV.
 
 Los datos no se borran: quedan en las tablas `plunk_lite_*` y vuelven a usarse si se regresa a Plunk Lite.
 
 1. Haz una copia de Postgres.
-2. Pon la imagen oficial (`ghcr.io/useplunk/plunk:<versión>`) en una versión igual o más nueva que la base de Plunk Lite. Si eliges una más antigua, la base de datos podría tener migraciones que esa versión no conoce. Desde la 0.18.0, la oficial aplica una migración que Plunk Lite no lleva, con valores nuevos en un enum que no se quitan con facilidad. Volver después a Plunk Lite funciona (medido en local, §4).
-3. Vuelve a poner el bloque `entrypoint`/`command` de `assets/docker-compose.yml`, o el contenedor arrancará también landing, wiki y SMTP.
-4. Despliega y verifica como en la Fase 1 de SKILL.md.
+2. Pon la imagen oficial (`ghcr.io/useplunk/plunk:<versión>`) en una versión igual o más nueva que la base de Plunk Lite. Si eliges una más antigua, la base de datos podría tener migraciones que esa versión no conoce. Desde la 0.18.0, la oficial aplica una migración que Plunk Lite no lleva, con valores nuevos en un enum que no se quitan con facilidad. Volver después a Plunk Lite funciona (medido en local, §3).
+3. Con el compose de esta skill, la oficial arranca también landing, wiki y SMTP: funciona, con unos 135 MB más (0.18.0, medido el 2026-11-01). El bloque `entrypoint`/`command` que los quita está en `assets/docker-compose.yml` de la versión 1.18.0 de esta skill; comprueba que sigue valiendo para esa versión de Plunk.
+4. Despliega y verifica: el contenedor queda healthy, `/health` da 200, el panel carga y la cuota de SES sale en el log.

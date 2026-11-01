@@ -1,6 +1,6 @@
 # MCP de Plunk accesible desde claude.ai, con login (Dokploy, compose raw con isolatedDeployment)
-# - plunk-mcp: el MCP de Plunk servido por HTTP: el oficial de npm o, con Plunk Lite, el de su fork,
-#   compilado en el despliegue (gen_compose.py --plunk-lite <commit>). Sin dominio: solo lo ve el proxy.
+# - plunk-mcp: el MCP de Plunk Lite servido por HTTP, compilado en el despliegue en el commit de la imagen
+#   (gen_compose.py --commit <commit>). Sin dominio: solo lo ve el proxy.
 # - plunk-mcp-auth: mcp-auth-proxy. Exige iniciar sesión con GitHub (solo los usuarios permitidos)
 #   y hace de servidor OAuth para claude.ai. Dominio en Dokploy: servicio plunk-mcp-auth, puerto 80.
 # Los valores ${...} vienen de la pestaña Environment de Dokploy.
@@ -11,11 +11,23 @@ services:
       context: .
       dockerfile_inline: |
         # syntax=docker/dockerfile:1
+        FROM node:22-alpine AS build
+        ADD https://github.com/joanproductivo/plunk-lite/archive/5892b47225e4fc1befd9b4cf47e307cc7c905247.tar.gz /tmp/src.tar.gz
+        RUN mkdir /src && tar -xzf /tmp/src.tar.gz -C /src --strip-components=1 && cp -r /src/apps/mcp /mcp
+        WORKDIR /mcp
+        RUN npm pkg delete devDependencies.@plunk/typescript-config \
+         && npm install --no-audit --no-fund \
+         && mkdir -p node_modules/@plunk \
+         && cp -r /src/packages/typescript-config node_modules/@plunk/typescript-config \
+         && npx tsc \
+         && npm pack --pack-destination /tmp
+
         FROM node:22-alpine
         WORKDIR /app
-        RUN npm install --omit=dev --no-audit --no-fund @plunk/mcp@0.18.0 @modelcontextprotocol/server@2.4.0 @modelcontextprotocol/node@2.1.2 && npm ls
+        COPY --from=build /tmp/plunk-mcp-*.tgz /tmp/
+        RUN npm install --omit=dev --no-audit --no-fund /tmp/plunk-mcp-*.tgz @modelcontextprotocol/server@2.4.0 @modelcontextprotocol/node@2.1.2 && npm ls && rm /tmp/plunk-mcp-*.tgz
         RUN cat > /app/server.mjs <<'EOF'
-        // Sirve el MCP oficial de Plunk (@plunk/mcp) por HTTP para ponerlo detrás de mcp-auth-proxy.
+        // Sirve el MCP de Plunk (paquete @plunk/mcp) por HTTP para ponerlo detrás de mcp-auth-proxy.
         // Solo escucha en la red interna del compose: el login lo exige el proxy de delante.
         //
         // Los clientes de la era 2025 van por sesiones con estado: así el servidor puede preguntar

@@ -1,22 +1,23 @@
 # plunk-dokploy-ses
 
-Skill para Claude que despliega y configura [Plunk](https://github.com/useplunk/plunk) self-hosted (email marketing y transaccional open source) en [Dokploy](https://dokploy.com) con AWS SES, de principio a fin.
+Skill para Claude que despliega y configura [Plunk Lite](https://github.com/joanproductivo/plunk-lite) self-hosted en [Dokploy](https://dokploy.com) con AWS SES, de principio a fin. Plunk Lite es un fork **no oficial** de [Plunk](https://github.com/useplunk/plunk) (email marketing y transaccional open source): lo mantiene una persona, no el equipo de Plunk, y no lleva relay SMTP.
 
-> **English:** a Claude skill to self-host Plunk on Dokploy with AWS SES, end to end. The skill is written in Spanish, but Claude follows it in whatever language you use.
+> **English:** a Claude skill to self-host Plunk Lite, an unofficial fork of Plunk maintained by one person and without the SMTP relay, on Dokploy with AWS SES, end to end. The skill is written in Spanish, but Claude follows it in whatever language you use.
 
 ## Qué hace
 
-- Despliega un compose de Plunk probado y recortado en memoria (unos 245 MB en lugar de 380 MB).
-- Permite elegir entre la imagen oficial de Plunk y [Plunk Lite](https://github.com/joanproductivo/plunk-lite), un fork ligero y no oficial (menos de la mitad de tamaño, editor de emails ampliado, segmentos estáticos con eventos y avisos de fallos, sin relay SMTP).
+- Despliega un compose probado de Plunk Lite: imagen de menos de la mitad de tamaño que la oficial, editor de emails ampliado, segmentos estáticos con eventos, lista de supresión propia y avisos de fallos.
 - Configura los dominios con Traefik y Let's Encrypt.
 - Prepara AWS SES: un usuario IAM con permisos mínimos (solo desde la IP del servidor), los configuration sets y el topic SNS que lleva los eventos a Plunk.
 - Te guía con los registros DNS del dominio de envío, incluidas las trampas de Cloudflare, o los crea por ti con el MCP de Cloudflare.
 - Explica por qué conviene un subdominio para el transaccional y otro para el marketing, y qué no separa.
 - Prueba los envíos en el sandbox de SES, pide la salida a producción y revisa el plan de precios.
 - Explica cómo enviar desde una web por API, los workflows, las aperturas falsas y el mantenimiento.
-- Publica el MCP de Plunk con login de GitHub para usarlo desde claude.ai.
+- Publica el MCP de Plunk Lite con login de GitHub para usarlo desde claude.ai.
 
-Sale de dos instalaciones reales montadas con Plunk 0.17.0 (octubre de 2026). La plantilla usa la 0.18.0, probada en local (noviembre de 2026).
+Sale de dos instalaciones reales.
+
+**¿Quieres la imagen oficial de Plunk?** La skill no la mantiene, porque hay demasiadas diferencias. Si la pides (por ejemplo, por el relay SMTP), Claude investiga antes los cambios de esa versión para instalarla bien.
 
 ## Instalación
 
@@ -29,7 +30,7 @@ git clone https://github.com/joanproductivo/plunk-dokploy-ses.git
 cp -R plunk-dokploy-ses/skills/plunk-dokploy-ses ~/.claude/skills/
 ```
 
-Después pídele a Claude, por ejemplo: «Instala Plunk en mi Dokploy con AWS SES».
+Después pídele a Claude, por ejemplo: «Instala Plunk Lite en mi Dokploy con AWS SES».
 
 ## Qué necesitas
 
@@ -48,7 +49,7 @@ Después pídele a Claude, por ejemplo: «Instala Plunk en mi Dokploy con AWS SE
 ```
 skills/plunk-dokploy-ses/
 ├── SKILL.md       las fases, de decidir a mantener
-├── references/    AWS SES, DNS, uso de Plunk, MCP remoto, operaciones, Plunk Lite y problemas frecuentes
+├── references/    AWS SES, DNS, uso de Plunk Lite, MCP remoto, operaciones y problemas frecuentes
 ├── scripts/       configuración y comprobación de SES, comprobación de DNS, generación del env, última versión de Plunk Lite
 └── assets/        compose de Plunk y del MCP remoto, plantillas de env
 ```

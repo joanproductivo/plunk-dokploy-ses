@@ -6,8 +6,8 @@
 #     --set API_DOMAIN=envio-api.example.com --set PANEL=si
 # Cabe en la capa gratuita: 3 alarmas (10 gratis) y emails de SNS (1.000 gratis al mes).
 # La suscripción de email hay que confirmarla desde el correo que manda AWS.
-# PANEL=si (solo con Plunk Lite) suscribe además el topic al webhook de Plunk, que confirma solo, y las
-# alarmas salen también en el banner del panel. Con la imagen oficial, PANEL=no.
+# PANEL=si suscribe además el topic al webhook de Plunk, que confirma solo, y las
+# alarmas salen también en el banner del panel.
 
 R = "__REGION__"
 EXPECTED_ACCOUNT = "__ACCOUNT_ID__"

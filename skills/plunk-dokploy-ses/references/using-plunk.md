@@ -1,6 +1,6 @@
 # Usar Plunk: API, webs, eventos y ajustes
 
-Comprobado contra el código de Plunk 0.17.0 y revisado con los cambios de la 0.18.0. En la API, las rutas van sobre `https://<API_DOMAIN>`.
+Comprobado contra el código de Plunk 0.17.0, la base de Plunk Lite, y contra el de sus funciones propias. En la API, las rutas van sobre `https://<API_DOMAIN>`.
 
 ## Índice
 1. Claves
@@ -50,8 +50,8 @@ Muchas plataformas (webs de cursos, comunidades, formularios) permiten enviar su
 - `reply` debe ser un **buzón que exista**: Plunk no recibe correo, y sin `reply` las respuestas irían a la dirección de envío, que normalmente no tiene buzón. Comprueba que el dominio del buzón tiene MX y un servidor que responda.
 - El HTML va dentro de una cadena JSON: la plataforma tiene que escapar comillas y saltos de línea al insertar `{{html}}`. Si no lo hace, Plunk responde 400.
 - `to` admite de 1 a 50 destinatarios.
-- **Segmentos (Plunk Lite).** `"segments": ["<id>", …]` añade a cada destinatario al que se envía a esos segmentos estáticos (hasta 20), con sus eventos de entrada. Un id que no es un segmento estático del proyecto da 422 y no se envía nada. Si los emails salen pero la entrada en los segmentos falla, la respuesta lo dice en `data.segmentsError`.
-- **Altas con un email que no recibe correo (Plunk Lite).** Un destinatario que aún no es contacto se rechaza con 422 `INVALID_EMAIL` si su dominio no existe, no recibe correo, es desechable o es una errata de un gran proveedor (`gmial.com`). `error.details` trae `reasons` y, si la hay, `suggestedEmail` (`ana@gmail.com`). **El formulario tiene que tratar ese 422** y pedir la dirección otra vez, ofreciendo la sugerida. Ante una duda del DNS la deja pasar; un buzón que no existe en un dominio real no se detecta. `PLUNK_LITE_VERIFY_SIGNUPS=false` lo apaga.
+- **Segmentos.** `"segments": ["<id>", …]` añade a cada destinatario al que se envía a esos segmentos estáticos (hasta 20), con sus eventos de entrada. Un id que no es un segmento estático del proyecto da 422 y no se envía nada. Si los emails salen pero la entrada en los segmentos falla, la respuesta lo dice en `data.segmentsError`.
+- **Altas con un email que no recibe correo.** Un destinatario que aún no es contacto se rechaza con 422 `INVALID_EMAIL` si su dominio no existe, no recibe correo, es desechable o es una errata de un gran proveedor (`gmial.com`). `error.details` trae `reasons` y, si la hay, `suggestedEmail` (`ana@gmail.com`). **El formulario tiene que tratar ese 422** y pedir la dirección otra vez, ofreciendo la sugerida. Ante una duda del DNS la deja pasar; un buzón que no existe en un dominio real no se detecta. `PLUNK_LITE_VERIFY_SIGNUPS=false` lo apaga.
 - Quien recibe un transaccional queda como contacto **no suscrito** a marketing. Si hay consentimiento explícito para el boletín, añade `"subscribed": true` solo en ese caso.
 - En el sandbox de SES solo llega a direcciones verificadas o al simulador (`success@simulator.amazonses.com`).
 
@@ -60,8 +60,8 @@ Muchas plataformas (webs de cursos, comunidades, formularios) permiten enviar su
 | Código | Significa |
 |---|---|
 | 200 con `"success": true` | Aceptado (la entrega se ve después en el log como `Delivery confirmed`) |
-| 207 (Plunk Lite, varios destinatarios) | Se envió a algunos; `data.failed` lista los demás con `{email, code, message, suggestedEmail?}`. No reintentes con la misma `Idempotency-Key` (da 409) ni reenvíes a los que salieron |
-| 422 `INVALID_EMAIL` (Plunk Lite) | El destinatario nuevo no puede recibir correo; muestra el mensaje y `details.suggestedEmail` |
+| 207 (varios destinatarios) | Se envió a algunos; `data.failed` lista los demás con `{email, code, message, suggestedEmail?}`. No reintentes con la misma `Idempotency-Key` (da 409) ni reenvíes a los que salieron |
+| 422 `INVALID_EMAIL` | El destinatario nuevo no puede recibir correo; muestra el mensaje y `details.suggestedEmail` |
 | 401 | Clave mala, o se usó `pk_` en vez de `sk_` |
 | 422 `Request validation failed` | Falta un campo o llega vacío (el detalle dice cuál: p. ej. `subject: String must contain at least 1 character(s)`) |
 | 400 | JSON inválido, casi siempre HTML sin escapar |
@@ -69,8 +69,6 @@ Muchas plataformas (webs de cursos, comunidades, formularios) permiten enviar su
 Si estos emails llevan enlaces de acceso o códigos, pon el tracking en **Marketing only** (sección 4): el seguimiento de clics reescribe los enlaces y los antivirus que los abren automáticamente pueden gastar un enlace de un solo uso antes que la persona.
 
 ## 3. Eventos y workflows (`/v1/track`)
-
-Desde la 0.18, la oficial admite `delivery` en `/v1/send`: `delivery.at` programa el envío (hasta 30 días) y `delivery.throttle` lo limita por destinatario (una ventana como `"24h"`). Plunk Lite no lo tiene (plunk-lite.md §2).
 
 Los eventos **no** van en `/v1/send`; son otra llamada:
 
@@ -82,14 +80,12 @@ Authorization: Bearer pk_…
 
 - `event` es texto libre: el primer envío lo crea. No hay lista que elegir.
 - **`subscribed`: si no se incluye, Plunk suscribe a la persona a marketing.** Para eventos como registro o login sin consentimiento de boletín, envía siempre `"subscribed": false`.
-- Con Plunk Lite, una dirección de su lista de supresión (rebote permanente o queja) no se vuelve a suscribir aunque el evento diga `"subscribed": true`: el contacto sigue dado de baja y no recibe nada, tampoco por `/v1/send`. Volver a suscribirla de forma explícita (por ejemplo, marcar el contacto como suscrito) da 409 `ADDRESS_SUPPRESSED`; no hay que reintentarlo.
-- `data` guarda datos del contacto para usarlos en los emails (con Plunk Lite, hasta 32 KB y 6 niveles por petición).
-- Con Plunk Lite, un contacto nuevo con un email que no recibe correo da 422 `INVALID_EMAIL` (igual que en `/v1/send`) y **el evento no se guarda**: el formulario debe pedir la dirección otra vez.
-- **La clave `pk_` es pública:** quien la lea en una página puede dar altas. Si el formulario llama desde su servidor:
-  - con Plunk Lite, usa `/v1/track` con la `sk_` (alta y evento en una sola llamada) y, si nada lo llama desde un navegador, `PLUNK_LITE_PUBLIC_TRACK=off` para apagar la `pk_`;
-  - con la imagen oficial, usa `POST /contacts` y `POST /events/track` (con `contactId`) con la `sk_`.
-- **Doble opt-in (Plunk Lite).** Con el interruptor del proyecto encendido (Settings → Brand, con un remitente de un dominio verificado), un alta por `/v1/track` con la `sk_` (un contacto nuevo, o `"subscribed": true` a uno dado de baja) no suscribe: manda un email de confirmación y la respuesta trae `data.pendingConfirmation: true` y `data.optIn` (`sent`, `throttled`, `capped`, `failed` o `held`). Al pulsar el enlace queda suscrito, lanza `contact.subscribed` y entra en sus `segments`. Con la `pk_` no se manda nada (`held`): el formulario tiene que llamar desde su servidor con la `sk_`. Las bienvenidas de marketing deben arrancar en `contact.subscribed` o en la entrada del segmento, no en el evento del formulario, cuyos emails de marketing se saltan mientras el contacto está pendiente. `/v1/send` con `subscribed: true` hace lo mismo y exige una plantilla transaccional (si no, 422 `OPT_IN_NEEDS_TRANSACTIONAL`).
-- **Segmentos (Plunk Lite, solo con la `sk_`).** `"segments": ["<id>", …]` mete al contacto en esos segmentos estáticos (hasta 20) en la misma llamada. Entra antes del evento, así que los workflows que arranca el evento ya lo ven dentro, y los eventos de entrada se lanzan después del evento. Con la `pk_` da 403, y un id que no es un segmento estático del proyecto da 422 sin guardar nada. Los ids se ven con `GET /segments` (con la `sk_`) o con `plunk_list_segments` en el MCP.
+- Una dirección de su lista de supresión (rebote permanente o queja) no se vuelve a suscribir aunque el evento diga `"subscribed": true`: el contacto sigue dado de baja y no recibe nada, tampoco por `/v1/send`. Volver a suscribirla de forma explícita (por ejemplo, marcar el contacto como suscrito) da 409 `ADDRESS_SUPPRESSED`; no hay que reintentarlo.
+- `data` guarda datos del contacto para usarlos en los emails (hasta 32 KB y 6 niveles por petición).
+- Un contacto nuevo con un email que no recibe correo da 422 `INVALID_EMAIL` (igual que en `/v1/send`) y **el evento no se guarda**: el formulario debe pedir la dirección otra vez.
+- **La clave `pk_` es pública:** quien la lea en una página puede dar altas. Si el formulario llama desde su servidor, usa `/v1/track` con la `sk_` (alta y evento en una sola llamada) y, si nada lo llama desde un navegador, `PLUNK_LITE_PUBLIC_TRACK=off` para apagar la `pk_`.
+- **Doble opt-in.** Con el interruptor del proyecto encendido (Settings → Brand, con un remitente de un dominio verificado), un alta por `/v1/track` con la `sk_` (un contacto nuevo, o `"subscribed": true` a uno dado de baja) no suscribe: manda un email de confirmación y la respuesta trae `data.pendingConfirmation: true` y `data.optIn` (`sent`, `throttled`, `capped`, `failed` o `held`). Al pulsar el enlace queda suscrito, lanza `contact.subscribed` y entra en sus `segments`. Con la `pk_` no se manda nada (`held`): el formulario tiene que llamar desde su servidor con la `sk_`. Las bienvenidas de marketing deben arrancar en `contact.subscribed` o en la entrada del segmento, no en el evento del formulario, cuyos emails de marketing se saltan mientras el contacto está pendiente. `/v1/send` con `subscribed: true` hace lo mismo y exige una plantilla transaccional (si no, 422 `OPT_IN_NEEDS_TRANSACTIONAL`).
+- **Segmentos (solo con la `sk_`).** `"segments": ["<id>", …]` mete al contacto en esos segmentos estáticos (hasta 20) en la misma llamada. Entra antes del evento, así que los workflows que arranca el evento ya lo ven dentro, y los eventos de entrada se lanzan después del evento. Con la `pk_` da 403, y un id que no es un segmento estático del proyecto da 422 sin guardar nada. Los ids se ven con `GET /segments` (con la `sk_`) o con `plunk_list_segments` en el MCP.
 - En el workflow, disparador **Event** con el **mismo nombre exacto** (distingue mayúsculas y espacios). Los workflows también pueden arrancar a mano (API) o por calendario.
 - Eventos reservados que genera Plunk (sirven de disparador pero no se pueden enviar con `/v1/track`): `email.sent`, `email.delivery`, `email.open`, `email.click`, `email.bounce`, `email.complaint`, `email.click_ignored` (Plunk Lite; no conviene automatizar sobre él), `contact.subscribed`, `contact.unsubscribed`, `segment.<nombre>.entry`, `segment.<nombre>.exit`. Evita automatizar sobre `email.open` por las aperturas falsas.
 - `contact.unsubscribed` lleva en sus datos un `reason` cuando no fue una baja normal: `snooze` (pausa temporal, vuelve sola), y con Plunk Lite `bounce` o `complaint` (la baja que causa un rebote permanente o una queja). Quien sincroniza bajas con su web puede leerlo en `event.reason` del cuerpo del webhook para tratar cada caso.
@@ -103,11 +99,11 @@ Settings → General → **Email tracking** (por proyecto):
 
 El selector solo aparece si existe `SES_CONFIGURATION_SET_NO_TRACKING` en el env (y el configuration set en AWS).
 
-**Clics automáticos:** los antivirus de correo pulsan enlaces, así que un clic tampoco prueba que haya una persona. Con Plunk Lite, los que SES marca como automáticos no cuentan ni lanzan workflows; los demás sí, y la oficial los cuenta todos. Un workflow con consecuencias (dar acceso, cobrar) no debería depender solo de un clic.
+**Clics automáticos:** los antivirus de correo pulsan enlaces, así que un clic tampoco prueba que haya una persona. Los que SES marca como automáticos no cuentan ni lanzan workflows; los demás sí. Un workflow con consecuencias (dar acceso, cobrar) no debería depender solo de un clic.
 
-**Aperturas falsas:** Gmail y algunos antivirus descargan el píxel al recibir el email. Desde la 0.18, Plunk no cuenta las aperturas que SES marca como automáticas (`isBotEvent`: `Likely`), ni lanza `email.open` con ellas; con Gmail, esa marca salió en cada descarga automática (https://github.com/useplunk/plunk/issues/531). Las que SES no marca siguen contando, así que algunos clientes y pasarelas de correo aún generan aperturas falsas. Opciones: tomar las aperturas como orientativas y fiarse de los clics, o quitar `OPEN` del configuration set (references/aws-ses.md, sección 9).
+**Aperturas falsas:** Gmail y algunos antivirus descargan el píxel al recibir el email. Plunk no cuenta las aperturas que SES marca como automáticas (`isBotEvent`: `Likely`), ni lanza `email.open` con ellas; con Gmail, esa marca salió en cada descarga automática (https://github.com/useplunk/plunk/issues/531). Las que SES no marca siguen contando, así que algunos clientes y pasarelas de correo aún generan aperturas falsas. Opciones: tomar las aperturas como orientativas y fiarse de los clics, o quitar `OPEN` del configuration set (references/aws-ses.md, sección 9).
 
-**Porcentajes con Marketing only o Disabled:** la oficial, también la 0.18, no tiene en cuenta el modo de seguimiento al calcular aperturas y clics. El dashboard divide entre todos los emails del proyecto (también transaccionales, del simulador, entrantes y no enviados), y Analytics, en la vista de todos los streams, entre todos los enviados. Los transaccionales sin seguimiento bajan el porcentaje: con 1 transaccional y 1 campaña abierta sale 50 % en lugar de 100 %. Está reportado en https://github.com/useplunk/plunk/issues/533. Los datos fiables son la página de cada campaña y Analytics filtrado por stream (pulsa la fila en la tabla "By stream"); la fila Transactional marca 0 % porque no se mide. Avísalo a la persona si usa Marketing only.
+**Porcentajes con Marketing only o Disabled:** el dashboard mide aperturas y clics sobre los emails con seguimiento, así que los transaccionales sin él no bajan el porcentaje. En Analytics, la fila Transactional de la tabla "By stream" marca 0 % porque no se mide.
 
 ## 5. Emails de la plataforma y límite de la API
 
@@ -120,7 +116,7 @@ Si la persona olvida la contraseña sin Platform emails, se puede restablecer de
 
 ## 6. MCP de Plunk
 
-Hay un MCP oficial, `@plunk/mcp`, que funciona con instalaciones propias: consultar contactos, plantillas, campañas, segmentos y workflows, y también crear, enviar y activar cosas. Por defecto pide confirmación antes de cada envío; `PLUNK_READ_ONLY=true` lo deja en solo lectura.
+El MCP oficial de Plunk, `@plunk/mcp`, funciona con instalaciones propias: consultar contactos, plantillas, campañas, segmentos y workflows, y también crear, enviar y activar cosas. Por defecto pide confirmación antes de cada envío; `PLUNK_READ_ONLY=true` lo deja en solo lectura.
 
 En Claude Code, que la persona lo añada con su clave (así la clave no pasa por el chat):
 
@@ -132,7 +128,7 @@ Una entrada por instalación (cada una apunta a una API). Para varios proyectos 
 
 Es un MCP **local** (stdio): solo funciona en el ordenador donde se instala y mientras está encendido. Para usarlo desde claude.ai, publícalo en el propio Dokploy con login: references/mcp-remote.md (probado con claude.ai, incluido lo que pasa con las confirmaciones de envío).
 
-Con Plunk Lite, el de npm funciona, pero no conoce sus funciones (segmentos estáticos, dados de baja en las campañas TRANSACTIONAL). El remoto de mcp-remote.md compila el de Plunk Lite; en local, la forma sencilla de tenerlo es usar ese mismo conector, que también aparece en Claude Code.
+El de npm funciona, pero no conoce las funciones de Plunk Lite (segmentos estáticos, dados de baja en las campañas TRANSACTIONAL) y ofrece algunas que no tiene (`delivery`, `plunk_reschedule_email`, `plunk_cancel_email`). El remoto de mcp-remote.md compila el de Plunk Lite; en local, la forma sencilla de tenerlo es usar ese mismo conector, que también aparece en Claude Code.
 
 ## 7. Lo que Plunk no hace
 

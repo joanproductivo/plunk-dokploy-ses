@@ -1,16 +1,15 @@
-# Plunk self-hosted para Dokploy (compose "raw", con isolatedDeployment activado)
+# Plunk Lite self-hosted para Dokploy (compose "raw", con isolatedDeployment activado)
+# Plunk Lite (https://github.com/joanproductivo/plunk-lite) es un fork no oficial de Plunk, mantenido por una persona.
 # Basado en https://github.com/useplunk/plunk/blob/main/docker-compose.yml
 # Cambios respecto al original:
-#   - Versión de Plunk fijada aquí (no :latest) para que actualizar sea un cambio consciente del compose
+#   - Versión fijada aquí (sha-<commit>, nunca :latest) para que actualizar sea un cambio consciente del compose
 #   - Sin container_name ni puertos publicados en el host: Traefik de Dokploy enruta por dominio
 #   - Servicios con prefijo plunk- para evitar choques de nombres DNS con otros stacks del servidor
-#   - Sin relay SMTP (puertos 465/587) ni ntfy (avisos push que nadie recibía)
-#   - Arranque sin landing, wiki ni relay SMTP para ahorrar ~135 MB (ver el servicio plunk)
+#   - Sin ntfy (avisos push que nadie recibía); la imagen no lleva landing, wiki ni relay SMTP
 #   - Logs de cada contenedor limitados a 3 ficheros de 10 MB (Docker no los rota por defecto)
 #   - Sin MinIO: las imágenes del editor van a un S3 externo (Cloudflare R2 u otro), configurado en el env
 # Los valores ${...} vienen de la pestaña Environment de Dokploy (ver assets/env.template).
 # Una variable solo llega a Plunk si aparece en la sección environment de abajo.
-# En comandos, $$ es un $ literal (Docker Compose interpreta $ como variable).
 
 services:
   plunk-postgres:
@@ -46,7 +45,7 @@ services:
         max-size: "10m"
         max-file: "3"
     # Techo de memoria para que Redis no se coma la del servidor; noeviction es lo que pide BullMQ (lleno,
-    # rechaza escrituras). Plunk Lite avisa a los proyectos al 80 %. Una instalación normal usa decenas de MB.
+    # rechaza escrituras). Plunk avisa a los proyectos al 80 %. Una instalación normal usa decenas de MB.
     command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-1gb} --maxmemory-policy noeviction
     volumes:
       - redis_data:/data
@@ -57,43 +56,20 @@ services:
       retries: 5
 
   plunk:
-    image: ghcr.io/useplunk/plunk:0.18.0
+    # La última versión la da scripts/plunk_lite_latest.py; actualizar sigue references/plunk-lite.md §4
+    image: ghcr.io/joanproductivo/plunk-lite:sha-5892b47
     restart: unless-stopped
-    # Margen para que Plunk termine lo que tiene en curso al parar: con los 10 s por defecto de
-    # Docker, un despliegue a mitad de una campaña cortaba envíos y lotes. Plunk Lite espera hasta
-    # 30 s (pm2 kill_timeout); con la imagen oficial no estorba.
+    # Margen para que api y worker terminen lo que tienen en curso al parar (pm2 espera 30 s): con los
+    # 10 s por defecto de Docker, un despliegue a mitad de una campaña cortaba envíos y lotes.
     stop_grace_period: 45s
     # Techo de memoria del contenedor, para que un proceso desbocado no tumbe el servidor ni a sus
-    # vecinos. Plunk usa unos 250 MB en reposo; Plunk Lite limita además el heap de api y worker dentro.
+    # vecinos. La imagen limita además el heap de api y worker dentro.
     mem_limit: 2g
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-    # Arranca Plunk sin landing, wiki ni el relay SMTP para ahorrar ~135 MB.
-    # Si una versión nueva cambia el script de arranque y el parche no aplica, arranca todo como siempre.
-    # Para volver al arranque original, borra entrypoint y command.
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        orig=/usr/local/bin/docker-entrypoint-nginx.sh
-        patched=/tmp/plunk-entrypoint.sh
-        cat > /tmp/plunk-filter-apps.js <<'EOF'
-        const file = '/tmp/ecosystem.config.js';
-        const config = require(file);
-        const skip = ['landing', 'wiki', 'smtp'];
-        config.apps = config.apps.filter(app => !skip.includes(app.name));
-        require('fs').writeFileSync(file, 'module.exports = ' + JSON.stringify(config, null, 2) + ';\n');
-        console.log('Plunk: arrancando ' + config.apps.map(app => app.name).join(', '));
-        EOF
-        sed -e '/replace_urls_in_app "landing"/d' \
-            -e '/replace_urls_in_app "wiki"/d' \
-            -e 's#^exec pm2-runtime start /tmp/ecosystem.config.js$$#node /tmp/plunk-filter-apps.js || echo "AVISO: no se pudieron quitar landing, wiki y smtp"; exec pm2-runtime start /tmp/ecosystem.config.js#' \
-            "$$orig" > "$$patched"
-        if grep -q 'plunk-filter-apps.js' "$$patched"; then exec sh "$$patched"; fi
-        echo "AVISO: el parche de arranque no aplica a esta versión de Plunk; arrancando todos los servicios"
-        exec "$$orig"
     environment:
       SERVICE: all
       NODE_ENV: production
@@ -148,22 +124,22 @@ services:
       PLUNK_FROM_ADDRESS: ${PLUNK_FROM_ADDRESS:-}
 
       AUTO_PROJECT_DISABLE: ${AUTO_PROJECT_DISABLE:-true}
-      # Plunk Lite: antes frena la campaña o el workflow que rebota; el proyecto solo se desactiva como último
+      # antes frena la campaña o el workflow que rebota; el proyecto solo se desactiva como último
       # recurso (rebotes en 7 días con ≥25 en ≥200 emails, o quejas con ≥5). Admiten coma decimal
       PLUNK_LITE_DISABLE_BOUNCE_PERCENT: ${PLUNK_LITE_DISABLE_BOUNCE_PERCENT:-8}
       PLUNK_LITE_DISABLE_COMPLAINT_PERCENT: ${PLUNK_LITE_DISABLE_COMPLAINT_PERCENT:-0.4}
       # Cerrado si el env no dice otra cosa: con las altas abiertas, cualquiera podría enviar con tu cuenta de SES
-      # Plunk Lite: los clics que SES marca como automáticos no cuentan ni lanzan workflows; false los cuenta
+      # los clics que SES marca como automáticos no cuentan ni lanzan workflows; false los cuenta
       IGNORE_AUTOMATIC_CLICKS: ${IGNORE_AUTOMATIC_CLICKS:-true}
       DISABLE_SIGNUPS: ${DISABLE_SIGNUPS:-true}
       SHOW_SPONSOR: ${SHOW_SPONSOR:-false}
       # Límite por proyecto en la API pública (track 100/s, send 20/s, contactos 50/s); acota una
       # integración desbocada o una clave pk_ usada en un formulario web
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
-      # Plunk Lite: un contacto nuevo por la API cuyo dominio no existe, no recibe correo, es desechable o es una
+      # un contacto nuevo por la API cuyo dominio no existe, no recibe correo, es desechable o es una
       # errata de un gran proveedor (gmial.com) recibe 422 con la dirección sugerida; false lo apaga
       PLUNK_LITE_VERIFY_SIGNUPS: ${PLUNK_LITE_VERIFY_SIGNUPS:-true}
-      # Plunk Lite: off apaga la clave pk_ con 403, si nada llama a /v1/track desde un navegador;
+      # off apaga la clave pk_ con 403, si nada llama a /v1/track desde un navegador;
       # /v1/track sigue funcionando con la sk_ desde un servidor
       PLUNK_LITE_PUBLIC_TRACK: ${PLUNK_LITE_PUBLIC_TRACK:-on}
     volumes:

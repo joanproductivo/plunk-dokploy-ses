@@ -1,11 +1,11 @@
 ---
 name: plunk-dokploy-ses
-description: Despliega y configura Plunk self-hosted (useplunk/plunk, email marketing y transaccional open source) en Dokploy con AWS SES. Incluye un compose probado y recortado en memoria, dominios con Traefik y Let's Encrypt, usuario IAM mínimo, configuration sets y SNS para eventos, DNS con Cloudflare y su MCP, subdominios para transaccional y marketing, salida del sandbox de SES y plan de precios. También cubre el envío desde una web por API (/v1/send, /v1/track), workflows, aperturas falsas, mantenimiento y el MCP de Plunk publicado con login para usarlo desde claude.ai. Permite usar la imagen oficial o Plunk Lite, un fork ligero no oficial. Úsala siempre que alguien quiera instalar, revisar, actualizar o arreglar Plunk en Dokploy o Docker con SES. También para conectar Plunk a AWS SES, verificar un dominio de envío, pedir producción en SES para Plunk o mandar emails de su web a través de Plunk, aunque no mencione Dokploy ni esta skill. En inglés también aplica (self-host Plunk, Plunk on Dokploy, Plunk SES setup).
+description: Despliega y configura Plunk Lite, un fork no oficial de Plunk (useplunk/plunk, email marketing y transaccional open source) mantenido por una persona y sin relay SMTP, en Dokploy con AWS SES. Incluye un compose probado, dominios con Traefik y Let's Encrypt, usuario IAM mínimo, configuration sets y SNS para eventos, DNS con Cloudflare y su MCP, subdominios para transaccional y marketing, salida del sandbox de SES y plan de precios. También cubre el envío desde una web por API (/v1/send, /v1/track), workflows, aperturas falsas, mantenimiento y su MCP publicado con login para usarlo desde claude.ai. Úsala siempre que alguien quiera instalar, revisar, actualizar o arreglar Plunk o Plunk Lite en Dokploy o Docker con SES. También para conectar Plunk a AWS SES, verificar un dominio de envío, pedir producción en SES para Plunk o mandar emails de su web a través de Plunk, aunque no mencione Dokploy ni esta skill. En inglés también aplica (self-host Plunk, Plunk on Dokploy, Plunk SES setup).
 ---
 
-# Plunk en Dokploy con AWS SES
+# Plunk Lite en Dokploy con AWS SES
 
-Guía para montar una instalación privada de Plunk que envía a través de AWS SES, desplegada como compose en Dokploy. Sale de dos instalaciones reales (DNS en Cloudflare, SES en eu-north-1), montadas con Plunk 0.17.0 en octubre de 2026. La plantilla usa la 0.18.0, probada en local en noviembre. Funciona igual con otras regiones y otros proveedores de DNS.
+Guía para montar una instalación privada de [Plunk Lite](https://github.com/joanproductivo/plunk-lite) que envía a través de AWS SES, desplegada como compose en Dokploy. Plunk Lite es un fork **no oficial** de Plunk: lo mantiene una persona, no el equipo de Plunk, y no lleva relay SMTP. En esta guía, «Plunk» es esa instalación. Sale de dos instalaciones reales (DNS en Cloudflare, SES en eu-north-1). Funciona igual con otras regiones y otros proveedores de DNS.
 
 Al terminar, la persona tiene:
 - un panel en `https://envio.<dominio>`;
@@ -35,6 +35,8 @@ Al terminar, la persona tiene:
 
 ## Fase 0: Decidir antes de tocar nada
 
+Antes de nada, di en una frase qué se va a instalar: un fork no oficial de Plunk, mantenido por una persona, sin relay SMTP (se envía por la API y el panel, no desde otro programa por SMTP). Lo que lleva está en references/plunk-lite.md §2. Si la persona necesita el relay SMTP o quiere solo software del proyecto oficial, ve a «Si alguien pide la imagen oficial».
+
 Pregunta solo lo que no sepas ya:
 
 1. **¿Cuántas cuentas de AWS?** Una instalación de Plunk usa **una sola** cuenta de SES para todos sus proyectos: las credenciales son de la instalación, no del proyecto. Si dos personas o empresas quieren factura y reputación de envío separadas, hacen falta dos instalaciones. Pueden ir en el mismo servidor (operations.md §10).
@@ -46,7 +48,6 @@ Pregunta solo lo que no sepas ya:
 4. **Región de SES.** La de la cuenta de AWS. Se usa la misma en todo.
 5. **Buzón para respuestas.** Plunk no recibe correo. Comprueba que la dirección de respuesta tiene un buzón que funcione (using-plunk.md §7).
 6. **Dónde guardar las imágenes del editor.** Plunk las sube a un almacenamiento S3 y las enlaza en los emails. La plantilla no lleva MinIO: usa un bucket externo, por defecto Cloudflare R2 (10 GB gratis, sin coste de salida, y no gasta memoria del servidor). La persona crea el bucket, conecta `envio-files.<dominio>` como dominio propio del bucket (en R2: Settings → Custom Domains; hace público el bucket) y crea un token con lectura y escritura solo en ese bucket. Apunta el endpoint (`https://<account_id>.r2.cloudflarestorage.com`) y el nombre del bucket; las claves del token se pegan en Dokploy en la Fase 2. Si no quiere un servicio externo, ver operations.md §6 (MinIO en el servidor o sin subidas).
-7. **Imagen oficial o Plunk Lite.** Por defecto se usa la imagen oficial de Plunk con el arranque recortado del compose. Plunk Lite es un fork ligero y no oficial, con menos de la mitad de tamaño, arreglos que la oficial aún no tiene y funciones propias (editor de emails ampliado, segmentos estáticos con eventos, avisos de fallos, doble opt-in), pero sin relay SMTP. Explícalo en una frase y pregúntalo solo si a la persona le importan el disco, esos arreglos o esas funciones (references/plunk-lite.md §2-3).
 
 ## Fase 1: Desplegar en Dokploy
 
@@ -59,8 +60,7 @@ Pregunta solo lo que no sepas ya:
    Guárdalo donde la persona tenga su proyecto, no en un sitio público ni en un repositorio.
 2. Crea el compose en el proyecto de Dokploy que diga la persona: tipo docker-compose, origen raw y nombre `plunk`.
 3. Actualiza el compose con el contenido de `assets/docker-compose.yml` y con **isolatedDeployment activado**. Así Postgres y Redis quedan en una red privada que solo ve Plunk.
-   - El compose ya fija la versión de Plunk. Si hay una más nueva, sigue antes operations.md §3.
-   - Con Plunk Lite, cambia antes la imagen por la última `sha-<commit>`, que da `scripts/plunk_lite_latest.py`, y quita el bloque `entrypoint`/`command` (references/plunk-lite.md §4).
+   - El compose fija la versión en una `sha-<commit>`. Antes, ejecuta `python3 scripts/plunk_lite_latest.py` y, si da una más nueva, ponla en `image` (references/plunk-lite.md §3). Nunca `latest`.
    - Postgres y Redis van dentro del compose a propósito: aislamiento, arranque en orden (Plunk migra la base al arrancar) y un solo bloque que desplegar.
 4. Guarda el env con el contenido de `plunk.env`. Ahora sí puedes hacerlo por la API, porque aún no hay claves de AWS.
 5. Crea los dos dominios, con HTTPS, Let's Encrypt y path `/`:
@@ -76,7 +76,8 @@ Pregunta solo lo que no sepas ya:
 
 **Verificación:**
 - El despliegue termina bien y el contenedor `plunk` queda healthy (tarda hasta 90 s en el primer arranque).
-- En el log del contenedor `plunk` sale `Plunk: arrancando nginx, api, worker, web`. Con Plunk Lite esa línea no sale: se comprueba como en references/plunk-lite.md §4.
+- En el log del contenedor `plunk`, pm2 arranca exactamente tres procesos: `App [nginx:0] online`, `App [api:1] online` y `App [worker:2] online`.
+- En el log aparecen `nginx: configuration file /etc/nginx/nginx.conf test is successful`, `URL replacement complete for web` y `Dead-letter queue worker started`. Si la configuración de nginx o el reemplazo de URLs fallan, el contenedor se para a propósito, en vez de quedarse a medias.
 - `https://envio-api.<dominio>/health` responde 200.
 - `https://envio.<dominio>` muestra el login.
 
@@ -118,7 +119,7 @@ Lee references/aws-ses.md. En resumen:
 4. **Prueba de envío.** En el sandbox, solo al simulador de SES o a direcciones verificadas (aws-ses.md §5).
    - Envía a las cuatro direcciones del simulador. En el log de `plunk` deben aparecer `Delivery confirmed`, dos `Permanent bounce received` y `Complaint received`: eso confirma toda la cadena SES → SNS → Plunk, rebotes y quejas incluidos.
    - Para ver el email en un buzón real, verifica antes esa dirección en SES y que la persona pulse el enlace (caduca a las 24 h).
-   - Con Plunk Lite, prueba también el vaciado de la DLQ con `scripts/dlq_test.snippet.py` (references/plunk-lite.md §4). Si se van a poner las alarmas de la Fase 5, mejor después de `ses_alarms`, para probar también que su aviso lanza el vaciado.
+   - Prueba también el vaciado de la DLQ con `scripts/dlq_test.snippet.py` (references/plunk-lite.md §3). Si se van a poner las alarmas de la Fase 5, mejor después de `ses_alarms`, para probar también que su aviso lanza el vaciado.
 
 ## Fase 4: Salir del sandbox
 
@@ -146,23 +147,33 @@ Propón estos ajustes y explica cada uno en una frase. Los cambios de env los ha
 
 - **Dominio de seguimiento propio** (`click.<dominio>`), antes del primer envío grande: los enlaces y el píxel dejan de pasar por el dominio compartido de AWS. Se configura en el DNS y en SES, no en el panel, y se prueba con una campaña filtrada a una dirección (aws-ses.md §11).
 
-- **Email tracking → "Marketing only"** (Settings → General) si la web va a enviar accesos o códigos por Plunk. Así los antivirus no gastan los enlaces de un solo uso. Contrapartida: el porcentaje de aperturas y clics del dashboard sale más bajo de lo real; los datos fiables están en cada campaña y en Analytics por stream (using-plunk.md §4).
+- **Email tracking → "Marketing only"** (Settings → General) si la web va a enviar accesos o códigos por Plunk. Así los antivirus no gastan los enlaces de un solo uso (using-plunk.md §4).
 - **Platform emails.** `PLUNK_API_KEY` + `PLUNK_FROM_ADDRESS`; sin ellos, "He olvidado mi contraseña" no envía nada.
 - **Límite de peticiones** (`RATE_LIMIT_ENABLED`): viene activado en el compose. Solo hay que tocarlo si una integración propia pasa de 100 eventos o 20 envíos por segundo.
-- **Altas desde un formulario** (Plunk Lite): la verificación del email de los contactos nuevos viene activada (`PLUNK_LITE_VERIFY_SIGNUPS`) y responde 422 con la dirección sugerida; avisa de que el formulario tiene que mostrar ese error (using-plunk.md §2). Si nada usa `/v1/track` desde el navegador, propón `PLUNK_LITE_PUBLIC_TRACK=off`, que apaga solo la clave pública: el servidor sigue llamando a `/v1/track` con la `sk_`. Y protección anti-bots en el formulario (Turnstile o un honeypot).
+- **Altas desde un formulario:** la verificación del email de los contactos nuevos viene activada (`PLUNK_LITE_VERIFY_SIGNUPS`) y responde 422 con la dirección sugerida; avisa de que el formulario tiene que mostrar ese error (using-plunk.md §2). Si nada usa `/v1/track` desde el navegador, propón `PLUNK_LITE_PUBLIC_TRACK=off`, que apaga solo la clave pública: el servidor sigue llamando a `/v1/track` con la `sk_`. Y protección anti-bots en el formulario (Turnstile o un honeypot).
 - **Copia diaria de Postgres** a un destino S3/R2 desde Dokploy (operations.md §5).
-- **`AUTO_PROJECT_DISABLE=true`** (ya viene así en el env generado). Con Plunk Lite frena primero la campaña o el workflow que rebota, y solo desactiva el proyecto como último recurso (`PLUNK_LITE_DISABLE_*_PERCENT`, ver `references/aws-ses.md`); con la oficial, el crítico desactiva el proyecto. Si la persona lo quiere apagar, que sepa que entonces solo recibe avisos. Recomienda también las alarmas de CloudWatch: `scripts/ses_alarms.snippet.py` (references/aws-ses.md). Los valores de entorno, siempre con punto decimal (`0.4`).
+- **`AUTO_PROJECT_DISABLE=true`** (ya viene así en el env generado). Frena primero la campaña o el workflow que rebota, y solo desactiva el proyecto como último recurso (`PLUNK_LITE_DISABLE_*_PERCENT`, ver `references/aws-ses.md`). Si la persona lo quiere apagar, que sepa que entonces solo recibe avisos. Recomienda también las alarmas de CloudWatch: `scripts/ses_alarms.snippet.py` (references/aws-ses.md). Los valores de entorno, siempre con punto decimal (`0.4`).
 - **No desplegar durante una campaña.** El compose da 45 s para terminar lo que está en curso, pero un despliegue en mitad de un envío grande sigue siendo un riesgo innecesario.
 - **Google Postmaster Tools.** Propón registrar el dominio raíz y los de envío, para ver la reputación en Gmail (dns.md §9). Sin volumen no enseña datos.
-- **Aperturas.** Avisa de que algunos clientes y antivirus generan aperturas falsas; Plunk solo descarta las que SES marca como automáticas. Los clics son más fiables, pero los antivirus también pulsan enlaces: Plunk Lite solo descarta los que SES marca como automáticos (using-plunk.md §4).
+- **Aperturas.** Avisa de que algunos clientes y antivirus generan aperturas falsas; Plunk solo descarta las que SES marca como automáticas. Los clics son más fiables, pero los antivirus también pulsan enlaces, y con ellos pasa lo mismo (using-plunk.md §4).
 
 ## Después: integrar y mantener
 
 - **Enviar desde una web, eventos y workflows, MCP de Plunk:** references/using-plunk.md.
-- **Usar Plunk desde claude.ai (MCP remoto con login de GitHub):** references/mcp-remote.md y `assets/mcp-remoto/`. Con Plunk Lite, genera el compose con su MCP, en el commit de la imagen (§2). Lee antes la §5: claude.ai no puede mostrar la confirmación de envíos de Plunk.
+- **Usar Plunk desde claude.ai (MCP remoto con login de GitHub):** references/mcp-remote.md y `assets/mcp-remoto/`. Su compose tiene que compilar el MCP en el commit de la imagen (§2). Lee antes la §5: claude.ai no puede mostrar la confirmación de envíos de Plunk.
 - **Actualizar, memoria, almacenamiento de imágenes, ntfy, cambiar de dominio, segunda instalación:** references/operations.md.
-- **Plunk Lite (desplegar, actualizar o volver a la oficial):** references/plunk-lite.md.
+- **Qué lleva Plunk Lite, actualizarla o volver a la oficial:** references/plunk-lite.md.
 - **Algo falla:** references/troubleshooting.md.
+
+## Si alguien pide la imagen oficial
+
+La skill no la mantiene: hay demasiadas diferencias con Plunk Lite. Si alguien la necesita (por ejemplo, por el relay SMTP), díselo e investiga antes de instalar los cambios de esa versión: notas de versión, `Dockerfile`, script de arranque, migraciones y variables. Después adapta el compose; cambiar solo la línea `image` no basta. Para pasar a ella desde una instalación que ya corre con Plunk Lite, sigue antes references/plunk-lite.md §5, porque ese paso puede dañar datos.
+
+Punto de partida, no una receta: lo medido el 2026-11-01 con la 0.18.0, en local (arm64), sin claves reales de AWS ni envíos por SES.
+- Ocupa ~1,6 GB sin comprimir y usa Node 24.22.1.
+- Con este compose y su imagen arranca también landing, wiki y SMTP, con ~380 MB de memoria. Con el arranque recortado de la versión 1.18.0 de esta skill, ~245 MB.
+- Su migración aplicó bien sobre una base vacía y sobre una 0.17.0 con datos.
+- `gen_compose.py --npm 0.18.0` da un MCP que funcionó contra esa API.
 
 ## Lo que más cuesta aprender
 
@@ -179,5 +190,5 @@ Cada punto salió de un error real:
 - **Un dominio de envío solo puede estar en un proyecto de Plunk.** Si lo borras, SES genera tokens DKIM nuevos.
 - **Cambiar la IP del servidor rompe los envíos.** La política de IAM está atada a esa IP.
 - **SNS reintenta solo 3 veces en un minuto por defecto.** Un despliegue o un reinicio más largo perdía rebotes y quejas, y con ellos las bajas. `ses_setup` sube los reintentos a unos 40 minutos y guarda lo que no llegue en una cola (aws-ses.md §10).
-- **La supresión de la cuenta de SES es la red de seguridad.** Bloquea a quien rebotó o se quejó en cualquier envío, también si la dirección vuelve a entrar con una importación. Comprueba que está activa (`ses_check`). Plunk Lite añade su propia lista, que además impide volver a suscribir esas direcciones (references/plunk-lite.md §2). Son dos listas: si solo se quita de la de Plunk, el siguiente envío rebota sin intentarlo y la dirección vuelve a suprimirse. «Remove suppression» quita las dos, con el permiso `ses:DeleteSuppressedDestination` que añade `ses_setup`.
+- **La supresión de la cuenta de SES es la red de seguridad.** Bloquea a quien rebotó o se quejó en cualquier envío, también si la dirección vuelve a entrar con una importación. Comprueba que está activa (`ses_check`). Plunk añade su propia lista, que además impide volver a suscribir esas direcciones (references/plunk-lite.md §2). Son dos listas: si solo se quita de la de Plunk, el siguiente envío rebota sin intentarlo y la dirección vuelve a suprimirse. «Remove suppression» quita las dos, con el permiso `ses:DeleteSuppressedDestination` que añade `ses_setup`.
 - **Un envío grande no cabe en el sandbox.** Son 200 emails al día: hay que salir del sandbox antes de la primera campaña de verdad.

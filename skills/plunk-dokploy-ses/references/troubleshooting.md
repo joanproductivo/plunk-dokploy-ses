@@ -26,7 +26,7 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | No aparece `AWS SES quota: …` en el log; errores `InvalidClientTokenId` | Claves aún de ejemplo o mal pegadas | La persona revisa `AWS_SES_ACCESS_KEY_ID`/`SECRET` y despliega |
 | `AccessDenied` en SES con claves correctas | Cambió la IP pública del servidor, o la región no coincide | Ejecuta `ses_setup` con la IP nueva; misma región en env y AWS |
 | Plunk no marca entregas, aperturas ni rebotes | Suscripción SNS sin confirmar o eventos sin configurar | `ses_check`; aws-ses.md §1 "Orden" |
-| `[WEBHOOK] SNS message rejected — topic is not in this AWS account` en el log | El topic está en otra cuenta que las claves de SES (Plunk 0.18 o más) | Usa claves y topic de la misma cuenta (aws-ses.md §1) |
+| `[WEBHOOK] SNS message rejected — topic is not in this AWS account` en el log | El topic está en otra cuenta que las claves de SES | Usa claves y topic de la misma cuenta (aws-ses.md §1) |
 | SNS recibe 503 `Could not verify SNS topic`; en el log, `[SNS] Could not look up the AWS account` | Plunk no pudo llamar a STS: claves mal pegadas o sin salida a `sts.<región>.amazonaws.com` | Revisa las claves y la salida a internet; SNS reintenta, así que los eventos no se pierden mientras dure su margen |
 | En el sandbox no llega el email | El destinatario no está verificado en SES | Envía al simulador o verifica la dirección (aws-ses.md §5) |
 | La dirección verificada sigue en `PENDING` | No se pulsó el enlace de AWS, o caducó (24 h) | Mira Spam y Promociones; si caducó, borra la identidad y créala otra vez (aws-ses.md §5) |
@@ -34,12 +34,12 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | No se puede cambiar el plan de precios de SES | Hay una petición de producción en revisión | Espera la respuesta de AWS |
 | AWS deniega la producción | Falta contexto de cómo se obtienen los contactos, o la web no muestra formulario | Responder en el mismo caso (aws-ses.md §6), sin reenviar la petición |
 | DKIM `PENDING` o `FAILED` | Registros DNS mal o en otra zona | `check_dns.sh` y dns.md §4 |
-| «Removed here, but not at SES» al quitar una supresión (Plunk Lite) | La política de `plunk-ses` no tiene `ses:DeleteSuppressedDestination` (en el log, `AccessDeniedException`) | Ejecuta `ses_setup` otra vez. No hay que reiniciar. Si SES aún la tiene, el siguiente envío la suprime otra vez: quítala de nuevo |
-| «SES did not answer» al quitar una supresión (Plunk Lite) | SES no respondió en 2 s, o las claves de AWS no valen. No se ha quitado de Plunk | Reinténtalo. Si se repite, mira el mensaje en el log (`[SES] Could not remove`) |
-| Una persona no recibe nada, aunque está suscrita (Plunk Lite) | Su dirección está en la lista de supresión | Filtra por «Suppressed» en Contactos. Quítala en su ficha solo si te ha pedido volver, sobre todo tras una queja |
-| El filtro «Suppressed» da «too many to filter on» (Plunk Lite) | Más de 20.000 suprimidos con contacto en el proyecto | El filtro no se puede usar. Etiquetas, fichas y envíos siguen igual |
-| `[WORKFLOW-RECOVERY] Sweeping again after a gap` en el log (Plunk Lite) | Normal 2 o 3 veces tras arrancar: las ejecuciones colgadas no se revisan hasta llevar 10 minutos de barridos seguidos | Nada, salvo que siga pasados unos 15 minutos o reaparezca sin reinicio: entonces mira si Redis o la base de datos se han caído |
-| Plunk Lite avisa «AWS dead-letter queue not readable» | La política de `plunk-ses` no tiene el statement `PlunkDLQ`, o la DLQ es de otra región o cuenta | Ejecuta `ses_setup` otra vez (aws-ses.md §2); el aviso se cierra solo con la siguiente lectura correcta |
+| «Removed here, but not at SES» al quitar una supresión | La política de `plunk-ses` no tiene `ses:DeleteSuppressedDestination` (en el log, `AccessDeniedException`) | Ejecuta `ses_setup` otra vez. No hay que reiniciar. Si SES aún la tiene, el siguiente envío la suprime otra vez: quítala de nuevo |
+| «SES did not answer» al quitar una supresión | SES no respondió en 2 s, o las claves de AWS no valen. No se ha quitado de Plunk | Reinténtalo. Si se repite, mira el mensaje en el log (`[SES] Could not remove`) |
+| Una persona no recibe nada, aunque está suscrita | Su dirección está en la lista de supresión | Filtra por «Suppressed» en Contactos. Quítala en su ficha solo si te ha pedido volver, sobre todo tras una queja |
+| El filtro «Suppressed» da «too many to filter on» | Más de 20.000 suprimidos con contacto en el proyecto | El filtro no se puede usar. Etiquetas, fichas y envíos siguen igual |
+| `[WORKFLOW-RECOVERY] Sweeping again after a gap` en el log | Normal 2 o 3 veces tras arrancar: las ejecuciones colgadas no se revisan hasta llevar 10 minutos de barridos seguidos | Nada, salvo que siga pasados unos 15 minutos o reaparezca sin reinicio: entonces mira si Redis o la base de datos se han caído |
+| Plunk avisa «AWS dead-letter queue not readable» | La política de `plunk-ses` no tiene el statement `PlunkDLQ`, o la DLQ es de otra región o cuenta | Ejecuta `ses_setup` otra vez (aws-ses.md §2); el aviso se cierra solo con la siguiente lectura correcta |
 
 ## Uso
 
@@ -49,23 +49,22 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | 422 `Request validation failed` | Un campo llega vacío; a menudo la variable de la plataforma tiene otro nombre (`{{asunto}}` en vez de `{{subject}}`) | Lee el detalle de la respuesta y la lista de variables de la plataforma |
 | 400 en `/v1/send` | HTML sin escapar dentro del JSON | Que la plataforma escape `{{html}}` |
 | Rechazo del remitente | `from` fuera de un dominio verificado | Usa una dirección del dominio de envío |
-| 413 en `/v1/send` o en el panel | Petición de más de 10 MB (nginx) o, con Plunk Lite, de más de 2 MB fuera de `/v1/send` | Adjuntos de unos 7 MB como mucho; las imágenes, subidas al editor y no pegadas en base64 |
-| 503 «Too many large sends in progress» (Plunk Lite) | Más de 8 envíos grandes (más de 2 MB) a la vez | Reintenta tras el `Retry-After`; repártelos en el tiempo |
-| 429 «Too many login attempts» (Plunk Lite) | 10 intentos fallidos con ese email en 15 minutos | Espera 15 minutos; un login correcto pone la cuenta a cero |
+| 413 en `/v1/send` o en el panel | Petición de más de 10 MB (nginx) o, de más de 2 MB fuera de `/v1/send` | Adjuntos de unos 7 MB como mucho; las imágenes, subidas al editor y no pegadas en base64 |
+| 503 «Too many large sends in progress» | Más de 8 envíos grandes (más de 2 MB) a la vez | Reintenta tras el `Retry-After`; repártelos en el tiempo |
+| 429 «Too many login attempts» | 10 intentos fallidos con ese email en 15 minutos | Espera 15 minutos; un login correcto pone la cuenta a cero |
 | 429 en `/v1/track`, `/v1/send` o contactos | Límite de peticiones por proyecto (`RATE_LIMIT_ENABLED`, activado en la plantilla) | Respeta `Retry-After`. Si una integración propia lo necesita de verdad, sube `RATE_LIMIT_*_PER_SECOND` en el env |
 | Emails marcados como abiertos sin abrir | Precarga del píxel por Gmail/Apple/antivirus | using-plunk.md §4 |
 | Enlaces de acceso que "ya se usaron" | El seguimiento de clics y los antivirus los abren antes | Tracking en "Marketing only" |
-| El dashboard marca un porcentaje de aperturas o clics más bajo que las campañas | Con tracking "Marketing only" o "Disabled", Plunk (también la 0.18) cuenta en el total los emails sin seguimiento (useplunk/plunk#533) | Mira la página de la campaña o Analytics filtrado por stream (using-plunk.md §4) |
 | Altas de eventos suscriben a gente sin consentimiento | `/v1/track` sin `"subscribed": false` | Añádelo |
-| 403 «Public keys are switched off» en `/v1/track` (Plunk Lite) | `PLUNK_LITE_PUBLIC_TRACK=off` y la llamada usa la `pk_` | Llámalo desde el servidor con la `sk_`, o vuelve a poner `on` |
-| 403 al usar `segments` en `/v1/track` (Plunk Lite) | Los segmentos solo se admiten con la `sk_` | Llama desde el servidor con la `sk_` |
-| 422 «Some segments cannot take contacts» (Plunk Lite) | Un id de `segments` no existe, es de otro proyecto o es un segmento con filtros | Usa ids de segmentos estáticos del proyecto |
-| 400 «Not enough SES quota» al enviar una campaña (Plunk Lite) | No cabe en el 95 % de la cuota de SES de 24 horas, contando lo enviado y lo que les falta a las campañas en curso | Envíala o prográmala cuando haya cuota, o pide más a AWS |
-| «Could not read the account's status» en el log (Plunk Lite) | La política de IAM no tiene `ses:GetAccount` | Ejecuta `ses_setup` otra vez (aws-ses.md §1). Mientras tanto, la pausa se deduce solo de los rechazos |
-| Aviso «Amazon SES» en el banner y los emails parados (Plunk Lite) | SES dio la cuota diaria por agotada o pausó la cuenta: la cola espera (15 min) o se pausa y prueba cada 30 min | Mira la cuenta en SES (aws-ses.md). El aviso se cierra solo con el primer email que sale |
-| Aviso «Temporary bounces» con varios contactos del mismo proveedor (Plunk Lite) | El proveedor puede estar rechazando al remitente, no ser buzones muertos | Mira la reputación (dns.md §9) y quita esas supresiones en la ficha, una a una. Filtra Contactos por Suppressed para verlos todos |
-| «Temporary bounces»: «no more are until the count drops» (Plunk Lite) | Freno de unos 20 cortes en 7 días | Quitar supresiones no lo baja: revisa la causa; los buzones muertos siguen sin cortarse hasta que baje la cuenta |
-| Clics en las estadísticas que nadie hizo, o un workflow que arranca solo | Antivirus que SES no marca como automáticos | Plunk Lite solo descarta los `Likely`; no hagas depender de un clic algo importante |
+| 403 «Public keys are switched off» en `/v1/track` | `PLUNK_LITE_PUBLIC_TRACK=off` y la llamada usa la `pk_` | Llámalo desde el servidor con la `sk_`, o vuelve a poner `on` |
+| 403 al usar `segments` en `/v1/track` | Los segmentos solo se admiten con la `sk_` | Llama desde el servidor con la `sk_` |
+| 422 «Some segments cannot take contacts» | Un id de `segments` no existe, es de otro proyecto o es un segmento con filtros | Usa ids de segmentos estáticos del proyecto |
+| 400 «Not enough SES quota» al enviar una campaña | No cabe en el 95 % de la cuota de SES de 24 horas, contando lo enviado y lo que les falta a las campañas en curso | Envíala o prográmala cuando haya cuota, o pide más a AWS |
+| «Could not read the account's status» en el log | La política de IAM no tiene `ses:GetAccount` | Ejecuta `ses_setup` otra vez (aws-ses.md §1). Mientras tanto, la pausa se deduce solo de los rechazos |
+| Aviso «Amazon SES» en el banner y los emails parados | SES dio la cuota diaria por agotada o pausó la cuenta: la cola espera (15 min) o se pausa y prueba cada 30 min | Mira la cuenta en SES (aws-ses.md). El aviso se cierra solo con el primer email que sale |
+| Aviso «Temporary bounces» con varios contactos del mismo proveedor | El proveedor puede estar rechazando al remitente, no ser buzones muertos | Mira la reputación (dns.md §9) y quita esas supresiones en la ficha, una a una. Filtra Contactos por Suppressed para verlos todos |
+| «Temporary bounces»: «no more are until the count drops» | Freno de unos 20 cortes en 7 días | Quitar supresiones no lo baja: revisa la causa; los buzones muertos siguen sin cortarse hasta que baje la cuenta |
+| Clics en las estadísticas que nadie hizo, o un workflow que arranca solo | Antivirus que SES no marca como automáticos | Plunk solo descarta los `Likely`; no hagas depender de un clic algo importante |
 | El workflow no se dispara | El nombre del evento no coincide exactamente | Mismo texto, mayúsculas y espacios incluidos |
 | No aparece el selector "Email tracking" | Falta `SES_CONFIGURATION_SET_NO_TRACKING` | Defínela y despliega |
 | "He olvidado mi contraseña" no envía nada | Platform emails desactivados | `PLUNK_API_KEY` + `PLUNK_FROM_ADDRESS` (using-plunk.md §5) |

@@ -1,6 +1,6 @@
-# Prueba de punta a punta del vaciado de la DLQ de Plunk Lite (references/plunk-lite.md §4). Deja en la cola
+# Prueba de punta a punta del vaciado de la DLQ de Plunk Lite (references/plunk-lite.md §3). Deja en la cola
 # plunk-ses-events-dlq un rebote permanente firmado por SNS, como el que SNS deja ahí cuando no consigue
-# entregarlo al webhook, para ver que Plunk Lite lo recoge, lo procesa y lo marca. Solo con Plunk Lite.
+# entregarlo al webhook, para ver que Plunk Lite lo recoge, lo procesa y lo marca.
 # Formato "snippet", como ses_setup: sustituye los __MARCADORES__ o usa run_snippet.py.
 #   python3 run_snippet.py dlq_test.snippet.py --profile PERFIL --set REGION=eu-north-1 \
 #     --set ACCOUNT_ID=123456789012 --set EMAIL_ID=<id del email> --set PROJECT_ID=<id del proyecto> \
@@ -111,5 +111,5 @@ finally:
     log.append("recursos temporales borrados")
 
 result = {"log": log, "next": "En unos 3 min (alarma ses-eventos-dlq) o en la próxima comprobación de 15 min: "
-          "mira el log de plunk y la ficha del contacto (references/plunk-lite.md §4)."}
+          "mira el log de plunk y la ficha del contacto (references/plunk-lite.md §3)."}
 result
