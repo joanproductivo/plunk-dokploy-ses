@@ -72,7 +72,9 @@ El MCP pide confirmación humana (elicitation) antes de estas acciones:
 - `plunk_send_campaign`;
 - activar un workflow que envía emails;
 - cambiar el disparador de un workflow activo con emails;
-- `plunk_start_workflow_execution`.
+- `plunk_start_workflow_execution`;
+- `plunk_continue_waiting_contacts` en un workflow con emails;
+- apagar «Keep contacts until an Exit step» o cancelar todas las ejecuciones con contactos esperando (Plunk Lite).
 
 **claude.ai no admite elicitation.** En octubre de 2026 se conectaba con el protocolo 2026-07-28 y clientInfo `Anthropic/ClaudeAI`, con capacidades `{}` o solo la extensión ui. Por eso esas acciones fallan con `-32021 … do not declare the required capability`, sin enviar nada.
 
@@ -84,7 +86,7 @@ Decide con la persona:
 | Permitirlas | `PLUNK_ALLOW_UNCONFIRMED_SENDS=true` | Todo desde Claude. La protección pasa a ser el aviso de permiso de Claude antes de cada herramienta |
 
 Si se permiten, recomienda dejar en "pedir permiso" (no "permitir siempre") en la configuración del conector en claude.ai:
-- **Envíos:** `plunk_send_email`, `plunk_send_campaign`, `plunk_set_workflow_enabled`, `plunk_start_workflow_execution`, `plunk_update_workflow`.
+- **Envíos:** `plunk_send_email`, `plunk_send_campaign`, `plunk_set_workflow_enabled`, `plunk_start_workflow_execution`, `plunk_continue_waiting_contacts`, `plunk_update_workflow`.
 - **Eventos:** `plunk_track_event`, porque puede disparar workflows que envían.
 - **Consentimiento:** `plunk_subscribe_contact` (suscribir a alguien requiere su consentimiento) y `plunk_unsubscribe_contact`.
 - **Borrados o cancelaciones:** `plunk_delete_contact`, `plunk_delete_workflow`, `plunk_delete_workflow_step`, `plunk_disconnect_workflow_steps`, `plunk_cancel_campaign`, `plunk_cancel_workflow_executions`.
