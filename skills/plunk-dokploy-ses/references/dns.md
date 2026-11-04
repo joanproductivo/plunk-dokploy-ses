@@ -109,7 +109,7 @@ Para separarlo todo hace falta otra cuenta de SES y otra instalación (operation
 **Cómo hacerlo:**
 1. Elige dos subdominios, distintos de los de la instalación. Añade cada uno en Settings → Domains y crea sus registros (§3).
 2. Cambia el remitente en las plantillas transaccionales, los workflows y las llamadas a `/v1/send`. Añadir el dominio no cambia nada por sí solo.
-3. Pon una dirección de respuesta con buzón real (`reply` en la API, Reply-To en plantillas y campañas). Los subdominios de envío no tienen MX, así que no reciben las respuestas.
+3. Pon una dirección de respuesta con buzón real (`reply` en la API, Reply-To en plantillas y campañas; en Plunk Lite puede ser de cualquier dominio). Los subdominios de envío no tienen MX, así que no reciben las respuestas.
 4. Si en una instalación que ya envía se mueve mucho volumen a un subdominio nuevo, hazlo poco a poco: empieza sin historial. Un transaccional de poco volumen se puede pasar de una vez.
 
 **No choca con el buzón de la raíz** (Google Workspace, Stalwart u otro). Ese correo usa el MX, el SPF y el DKIM de la raíz, y Plunk solo crea nombres por debajo del subdominio de envío. Si algún día hay que recibir en ese subdominio, se añade su MX hacia el buzón; no choca con el de los rebotes, que está en `plunk.<subdominio>`.
