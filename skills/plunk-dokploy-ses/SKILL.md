@@ -186,7 +186,7 @@ Cada punto salió de un error real:
 - **Revisa la zona antes de crear registros.** Si la persona tiene varios dominios en la misma cuenta de Cloudflare, es fácil equivocarse de zona.
 - **El MX opcional de "inbound email" no se añade.** Sin reglas de recepción en SES, el correo que llega ahí se pierde.
 - **Los nombres de las variables los pone la plataforma.** En la plantilla JSON de una web, `{{subject}}` puede no existir y llamarse `{{asunto}}`. Si falta, Plunk responde 422.
-- **`/v1/track` suscribe al contacto si no se le dice `"subscribed": false`.**
+- **`/v1/track` solo suscribe con `"subscribed": true`** (Plunk Lite; la oficial suscribe si no se le dice `false`). Un contacto nuevo sin el campo nace sin suscribir, y los emails de marketing de sus workflows se le saltan: los pasos que siguen a una compra o un acceso van con plantillas transaccionales (using-plunk.md §3).
 - **Un dominio de envío solo puede estar en un proyecto de Plunk.** Si lo borras, SES genera tokens DKIM nuevos.
 - **Cambiar la IP del servidor rompe los envíos.** La política de IAM está atada a esa IP.
 - **SNS reintenta solo 3 veces en un minuto por defecto.** Un despliegue o un reinicio más largo perdía rebotes y quejas, y con ellos las bajas. `ses_setup` sube los reintentos a unos 40 minutos y guarda lo que no llegue en una cola (aws-ses.md §10).

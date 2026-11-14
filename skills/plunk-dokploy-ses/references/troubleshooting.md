@@ -55,7 +55,8 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | 429 en `/v1/track`, `/v1/send` o contactos | Límite de peticiones por proyecto (`RATE_LIMIT_ENABLED`, activado en la plantilla) | Respeta `Retry-After`. Si una integración propia lo necesita de verdad, sube `RATE_LIMIT_*_PER_SECOND` en el env |
 | Emails marcados como abiertos sin abrir | Precarga del píxel por Gmail/Apple/antivirus | using-plunk.md §4 |
 | Enlaces de acceso que "ya se usaron" | El seguimiento de clics y los antivirus los abren antes | Tracking en "Marketing only" |
-| Altas de eventos suscriben a gente sin consentimiento | `/v1/track` sin `"subscribed": false` | Añádelo |
+| Altas de eventos suscriben a gente sin consentimiento | Imagen oficial, o Plunk Lite anterior a esta corrección: `/v1/track` sin `subscribed` suscribe al contacto nuevo | Actualiza a la última Plunk Lite; con la oficial, añade `"subscribed": false` (que también da de baja a quien ya estaba suscrito) |
+| Un workflow que arranca con un evento no manda sus emails a contactos nuevos; el email sale como fallido, «Contact is unsubscribed from marketing emails» | En Plunk Lite, `/v1/track` sin `"subscribed": true` crea el contacto sin suscribir, y un email de marketing se salta a quien no está suscrito | Plantillas transaccionales para esos pasos (compras, accesos), o `"subscribed": true` cuando haya consentimiento de boletín |
 | 403 «Public keys are switched off» en `/v1/track` | `PLUNK_LITE_PUBLIC_TRACK=off` y la llamada usa la `pk_` | Llámalo desde el servidor con la `sk_`, o vuelve a poner `on` |
 | 403 al usar `segments` en `/v1/track` | Los segmentos solo se admiten con la `sk_` | Llama desde el servidor con la `sk_` |
 | 422 «Some segments cannot take contacts» | Un id de `segments` no existe, es de otro proyecto o es un segmento con filtros | Usa ids de segmentos estáticos del proyecto |
