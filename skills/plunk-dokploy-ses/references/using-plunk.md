@@ -53,6 +53,7 @@ Muchas plataformas (webs de cursos, comunidades, formularios) permiten enviar su
 - **Segmentos.** `"segments": ["<id>", …]` añade a cada destinatario al que se envía a esos segmentos estáticos (hasta 20), con sus eventos de entrada. Un id que no es un segmento estático del proyecto da 422 y no se envía nada. Si los emails salen pero la entrada en los segmentos falla, la respuesta lo dice en `data.segmentsError`. `null` o `""` como campo, y las entradas en blanco o `null` (`[""]`, como manda un formulario con el campo vacío), no nombran ningún segmento; las entradas cuentan igual para el máximo de 20. Un error señala la posición original de la entrada (`segments.1` en `["", "abc"]`).
 - **Altas con un email que no recibe correo.** Un destinatario que aún no es contacto se rechaza con 422 `INVALID_EMAIL` si su dominio no existe, no recibe correo, es desechable o es una errata de un gran proveedor (`gmial.com`). `error.details` trae `reasons` y, si la hay, `suggestedEmail` (`ana@gmail.com`). **El formulario tiene que tratar ese 422** y pedir la dirección otra vez, ofreciendo la sugerida. Ante una duda del DNS la deja pasar; un buzón que no existe en un dominio real no se detecta. `PLUNK_LITE_VERIFY_SIGNUPS=false` lo apaga.
 - Quien recibe un transaccional queda como contacto **no suscrito** a marketing. Si hay consentimiento explícito para el boletín, añade `"subscribed": true` solo en ese caso.
+- **Avisos a mucha gente.** Si una plantilla transaccional es un aviso que alguien puede no querer seguir recibiendo (los recordatorios de un taller), ponle un tema de baja (plunk-lite.md §2): sus emails llevan la baja de un clic y un pie con enlace, y a quien se da de baja ya no le llega esa plantilla. `/v1/send` con ella responde 422 `CONTACT_OPTED_OUT` para ese destinatario: no lo reintentes.
 - En el sandbox de SES solo llega a direcciones verificadas o al simulador (`success@simulator.amazonses.com`).
 
 **Respuestas de Plunk:**
@@ -62,6 +63,8 @@ Muchas plataformas (webs de cursos, comunidades, formularios) permiten enviar su
 | 200 con `"success": true` | Aceptado (la entrega se ve después en el log como `Delivery confirmed`) |
 | 207 (varios destinatarios) | Se envió a algunos; `data.failed` lista los demás con `{email, code, message, suggestedEmail?}`. No reintentes con la misma `Idempotency-Key` (da 409) ni reenvíes a los que salieron |
 | 422 `INVALID_EMAIL` | El destinatario nuevo no puede recibir correo; muestra el mensaje y `details.suggestedEmail` |
+| 422 `CONTACT_OPTED_OUT` | El destinatario se dio de baja del tema de esa plantilla; no se envía, y el resto de transaccionales le siguen llegando |
+| 422 `OPT_OUT_SEGMENT_MISSING` | Falta el segmento del tema de la plantilla: no se manda a nadie hasta elegir otro o quitar el tema |
 | 401 | Clave mala, o se usó `pk_` en vez de `sk_` |
 | 422 `Request validation failed` | Falta un campo o llega vacío (el detalle dice cuál: p. ej. `subject: String must contain at least 1 character(s)`) |
 | 400 | JSON inválido, casi siempre HTML sin escapar |
@@ -128,7 +131,7 @@ Una entrada por instalación (cada una apunta a una API). Para varios proyectos 
 
 Es un MCP **local** (stdio): solo funciona en el ordenador donde se instala y mientras está encendido. Para usarlo desde claude.ai, publícalo en el propio Dokploy con login: references/mcp-remote.md (probado con claude.ai, incluido lo que pasa con las confirmaciones de envío).
 
-El de npm funciona, pero no conoce las funciones de Plunk Lite (segmentos estáticos, dados de baja en las campañas TRANSACTIONAL) y ofrece algunas que no tiene (`delivery`, `plunk_reschedule_email`, `plunk_cancel_email`). El remoto de mcp-remote.md compila el de Plunk Lite; en local, la forma sencilla de tenerlo es usar ese mismo conector, que también aparece en Claude Code.
+El de npm funciona, pero no conoce las funciones de Plunk Lite (segmentos estáticos, dados de baja en las campañas TRANSACTIONAL, temas de baja, esperas con fecha) y ofrece algunas que no tiene (`delivery`, `plunk_reschedule_email`, `plunk_cancel_email`). El remoto de mcp-remote.md compila el de Plunk Lite; en local, la forma sencilla de tenerlo es usar ese mismo conector, que también aparece en Claude Code.
 
 ## 7. Lo que Plunk no hace
 

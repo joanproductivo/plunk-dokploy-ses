@@ -6,7 +6,7 @@ Skill para Claude que despliega y configura [Plunk Lite](https://github.com/joan
 
 ## Qué hace
 
-- Despliega un compose probado de Plunk Lite: imagen de menos de la mitad de tamaño que la oficial, editor de emails ampliado, segmentos estáticos con eventos, lista de supresión propia y avisos de fallos.
+- Despliega un compose probado de Plunk Lite: imagen de menos de la mitad de tamaño que la oficial, editor de emails ampliado, segmentos estáticos con eventos, avisos transaccionales con baja de un clic, esperas hasta una fecha con reparto de la salida, lista de supresión propia y avisos de fallos.
 - Configura los dominios con Traefik y Let's Encrypt.
 - Prepara AWS SES: un usuario IAM con permisos mínimos (solo desde la IP del servidor), los configuration sets y el topic SNS que lleva los eventos a Plunk.
 - Te guía con los registros DNS del dominio de envío, incluidas las trampas de Cloudflare, o los crea por ti con el MCP de Cloudflare.

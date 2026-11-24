@@ -71,6 +71,11 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | «Temporary bounces»: «no more are until the count drops» | Freno de unos 20 cortes en 7 días | Quitar supresiones no lo baja: revisa la causa; los buzones muertos siguen sin cortarse hasta que baje la cuenta |
 | Clics en las estadísticas que nadie hizo, o un workflow que arranca solo | Antivirus que SES no marca como automáticos | Plunk solo descarta los `Likely`; no hagas depender de un clic algo importante |
 | El workflow no se dispara | El nombre del evento no coincide exactamente | Mismo texto, mayúsculas y espacios incluidos |
+| El pie de avisos de una plantilla con tema sale en inglés | Los contactos no tienen `locale` y el proyecto está en inglés, el idioma por defecto | Cambia el idioma del proyecto en Settings, o escribe el texto en el pie de avisos del inglés (Settings → Brand) |
+| Un email de workflow falla con «Contact opted out of this kind of email» | El contacto se dio de baja del tema de esa plantilla | Es lo esperado. Si fue por error, sácalo del segmento del tema |
+| 422 `OPT_OUT_SEGMENT_MISSING`, o aviso «Template "…"» | Falta el segmento del tema de la plantilla | Elige otro segmento en la plantilla o quita el tema |
+| La espera con fecha no deja guardar el margen (`spread_overlaps_next`) | El margen se mete en la siguiente espera con fecha y haría saltarse emails | Reduce el margen o separa más las dos fechas |
+| Gmail aplaza un aviso que sale a miles de contactos a la vez | Muchos emails en el mismo minuto desde un remitente con poco historial | «Spread sends over» en la espera con fecha (plunk-lite.md §2) |
 | No aparece el selector "Email tracking" | Falta `SES_CONFIGURATION_SET_NO_TRACKING` | Defínela y despliega |
 | "He olvidado mi contraseña" no envía nada | Platform emails desactivados | `PLUNK_API_KEY` + `PLUNK_FROM_ADDRESS` (using-plunk.md §5) |
 | Las respuestas a los emails se pierden | `reply` apunta a un dominio sin buzón o sin servidor de correo activo | Usa un buzón real; comprueba su MX |

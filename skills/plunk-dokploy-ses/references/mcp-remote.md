@@ -109,6 +109,7 @@ Una campaña TRANSACTIONAL también llega a los contactos dados de baja, así qu
 | claude.ai: "No se pudo registrar con el servicio de inicio de sesión…" y en el log del proxy no aparece ningún `/.idp/register` | Una regla del WAF de Cloudflare bloquea las rutas que empiezan por `/.` (una regla habitual contra `/.env`, `/.git`…). mcp-auth-proxy usa `/.idp/*` y `/.auth/*`, que no se pueden cambiar | En la condición de la regla que bloquea `/.`, añade `and http.host ne "envio-mcp.<dominio>"`. Si el editor rechaza la expresión, prueba esa forma simple antes que un `not (…)` anidado. Alternativa: registro A `envio-mcp` en nube gris. La regla es por zona: repítelo en cada dominio |
 | Envíos masivos fallan con `-32021` | El cliente no admite confirmación | §5 |
 | El conector deja de funcionar tras redesplegar | Se recreó `plunk-mcp-auth` y se perdieron sus datos | Sus claves y tokens están en el volumen `auth_data`; no lo borres. Si se pierde, reconecta el conector |
+| Tras actualizar el MCP, claude.ai no ofrece una herramienta o un parámetro nuevos | claude.ai guarda la lista de herramientas de cuando se conectó | Reconecta el conector en claude.ai |
 | 401 al usar el MCP con la sesión iniciada | Usuario de GitHub fuera de `GITHUB_ALLOWED_USERS` | Añádelo (separado por comas) y despliega |
 
 ## 8. Mantenimiento
