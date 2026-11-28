@@ -74,6 +74,9 @@ Busca el síntoma; la última columna dice dónde ampliar.
 | El pie de avisos de una plantilla con tema sale en inglés | Los contactos no tienen `locale` y el proyecto está en inglés, el idioma por defecto | Cambia el idioma del proyecto en Settings, o escribe el texto en el pie de avisos del inglés (Settings → Brand) |
 | Un email de workflow falla con «Contact opted out of this kind of email» | El contacto se dio de baja del tema de esa plantilla | Es lo esperado. Si fue por error, sácalo del segmento del tema |
 | 422 `OPT_OUT_SEGMENT_MISSING`, o aviso «Template "…"» | Falta el segmento del tema de la plantilla | Elige otro segmento en la plantilla o quita el tema |
+| Una campaña no se envía: «The opt-out segment of this campaign no longer exists» | Falta el segmento del tema de la campaña | Elige otro segmento en «Campaign type» o quita el tema; si está programada, cancélala a borrador antes |
+| «Cannot delete segment: it is the opt-out topic of the campaign(s) …» | Lo usa una campaña en borrador, programada, enviándose, o enviada o cancelada sin archivar | Quítalo de los borradores y archiva las enviadas: sus emails enlazan al segmento |
+| «Cannot change the opt-out topic of a scheduled campaign» o «Cannot change the type of a scheduled campaign» | En una programada el tema y el tipo forman parte de la audiencia | Cancélala a borrador, cámbialo y vuelve a programarla |
 | La espera con fecha no deja guardar el margen (`spread_overlaps_next`) | El margen se mete en la siguiente espera con fecha y haría saltarse emails | Reduce el margen o separa más las dos fechas |
 | Gmail aplaza un aviso que sale a miles de contactos a la vez | Muchos emails en el mismo minuto desde un remitente con poco historial | «Spread sends over» en la espera con fecha (plunk-lite.md §2) |
 | No aparece el selector "Email tracking" | Falta `SES_CONFIGURATION_SET_NO_TRACKING` | Defínela y despliega |
